@@ -53,8 +53,8 @@ export function UnitsPage() {
   });
 
   const columns: Column<UnitSummary>[] = [
-    { key: "building", header: "Building", sort: "building_name", render: (u) => <Link to={`/buildings/${u.buildingId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.buildingName}</Link> },
-    { key: "unit", header: "Unit", sort: "unit_number", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
+    { key: "building", header: "Building", sort: "building_name", card: "hidden", render: (u) => <Link to={`/buildings/${u.buildingId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.buildingName}</Link> },
+    { key: "unit", header: "Unit", sort: "unit_number", card: "title", render: (u) => <span className="font-medium">{u.unitNumber}<span className="font-normal text-muted-foreground md:hidden"> · {u.buildingName}</span></span> },
     { key: "type", header: "Type", sort: "unit_type", render: (u) => u.unitType ?? "—" },
     { key: "tenant", header: "Tenant", sort: "tenant_name", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : <span className="text-muted-foreground">—</span>) },
     { key: "start", header: "Start", sort: "start_date", render: (u) => formatDate(u.startDate) },

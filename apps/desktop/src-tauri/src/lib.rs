@@ -1,24 +1,23 @@
 //! Tauri shell. Deliberately thin: the React UI talks to `renewal-server` over HTTP,
-//! so the same frontend runs on Windows and (later) Android. The Rust side only
-//! provides what a webview cannot do on its own — a platform secure store for the
-//! server URL and session token, and (in later phases) native notifications, tray,
-//! updater and deep links.
+//! so the same frontend runs on Windows and Android. The Rust side only provides
+//! what a webview cannot do on its own — a platform secure store for the server
+//! URL and session token, and native notifications.
 
 mod secure;
 
 #[tauri::command]
-fn secure_get(key: String) -> Result<Option<String>, String> {
-    secure::get(&key).map_err(|e| e.to_string())
+fn secure_get(app: tauri::AppHandle, key: String) -> Result<Option<String>, String> {
+    secure::get(&app, &key).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn secure_set(key: String, value: String) -> Result<(), String> {
-    secure::set(&key, &value).map_err(|e| e.to_string())
+fn secure_set(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    secure::set(&app, &key, &value).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn secure_delete(key: String) -> Result<(), String> {
-    secure::delete(&key).map_err(|e| e.to_string())
+fn secure_delete(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    secure::delete(&app, &key).map_err(|e| e.to_string())
 }
 
 /// "windows" | "android" | "linux" | "macos" — lets the UI adapt (touch targets, tray, updater).

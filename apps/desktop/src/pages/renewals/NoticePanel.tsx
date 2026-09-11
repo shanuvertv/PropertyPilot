@@ -98,7 +98,7 @@ export function NoticePanel({ caseId, open, onChanged }: { caseId: string; open:
           {ws.data?.draft && <NoticeStatusBadge status="DRAFT" />}
         </CardTitle>
         {canSend && (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             <Button size="sm" variant="ghost" onClick={() => regenerate.mutate()} title="Re-populate the letter from the template and current contract data">
               Re-populate
             </Button>

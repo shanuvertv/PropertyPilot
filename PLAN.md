@@ -2,7 +2,7 @@
 
 **Source:** `1.docx` (21-section functional spec)
 **Target:** greenfield build in `D:\Umair` — Windows desktop app now, Android app later, both Tauri 2 + Rust with one shared React UI, backed by a Rust API server
-**Status:** Phases 0–8 built (11 Sep 2026) — Windows app + server are feature-complete against the spec; Phase 9 (Android) and the external items in §8 (Graph app registration, code-signing certificate, UAT, production DB) remain. Repo: https://github.com/shanuvertv/PropertyPilot
+**Status:** Phases 0–9 built (11 Sep 2026) — Windows app, Android app and server are feature-complete against the spec. Open items need the client/IT: Android SDK build + signing keystore, code-signing certificate, Graph app registration or the mailbox's SMTP/IMAP credentials, the Lightsail database + instance, and UAT. Repo: https://github.com/shanuvertv/PropertyPilot
 
 ---
 
@@ -114,6 +114,10 @@ D:\Umair
 Cross-cutting: global search (`pg_trgm`), pagination on every list, org timezone from Settings, `tracing` logs, daily `pg_dump` backups, a "disconnected" banner in the client when the server is unreachable (no offline editing in v1).
 
 ---
+
+### Hosting decision (11 Sep 2026)
+
+The database will live in **AWS Lightsail** (managed PostgreSQL). The server therefore runs on a Lightsail Linux instance next to it (systemd unit or the container image), behind Caddy for HTTPS; both apps talk to `https://<host>`. The Windows-Service install stays as the on-premises alternative. Runbook: `deploy/lightsail.md`.
 
 ## 5. Data model
 
@@ -246,9 +250,9 @@ Each phase ends with something demoable. Effort assumes one senior developer com
 | **6 — Automation & notifications** ✅ *(built 11 Sep 2026)* | Worker cron sweep (pure `core::sweep` + DB adapter); reminder rules table + Admin UI; idempotent dispatch with catch-up; urgent flag; expired marking; notification centre (bell + page + deep links, 6 types) fed by `LISTEN/NOTIFY`; native toasts + tray badge; internal reminder emails; follow-up due/overdue notifications; worker heartbeat shown in Settings | Time-travel tests: advancing the clock fires each reminder exactly once; Admin edits schedule and next run honours it; toast appears on a new urgent notification | 1 wk |
 | **7 — Reports & audit UI** ✅ *(built 11 Sep 2026)* | 5 reports with filters; Excel (`rust_xlsxwriter`) + PDF (Typst) export via native save dialog; audit trail viewer + per-record History tab | Each export matches on-screen data | 1 wk |
 | **8 — Packaging, hardening & launch** 🟡 *(code done 11 Sep 2026; external items open)* | **Done:** MSI/NSIS installer with WebView2 bootstrapper; server as a Windows Service (`renewal-server --service`, `installers/install-server.ps1`) with optional built-in TLS and file logging; login rate limiting; change-password + admin reset (sessions revoked); Excel tenant-list import (preview → commit, idempotent); production CSP; permission-matrix checks in every service; runbook in README. **Open (needs the client/IT):** code-signing certificate, updater endpoint + signing keys, Graph app registration, production DB + backups + monitoring, UAT with the leasing team, optional Entra ID SSO. | UAT sign-off; installed app on a user PC logs in and sends one real notice; the server runs the sweep unattended overnight | 2 wk |
-| **9 — Android** | `tauri android init`; Android keystore for the token (`keyring` android feature); phone-width pass over every screen (touch targets, bottom navigation, tables → cards); notifications via the API's SSE while open (push via FCM only if Q15 says so); signed APK/AAB; distribution via MDM or Play (Q14); device testing on the org's phone models | Leasing user completes login → view unit → record tenant response → add follow-up on a phone | 2 wk |
+| **9 — Android** 🟡 *(code done 11 Sep 2026; device build open)* | **Done:** Tauri Android shell config (`bundle.android`, mobile entry point, `cargo check --target aarch64-linux-android` clean); token in the app-private data directory (Google deprecated EncryptedSharedPreferences in 2024 — the sandbox is the recommended store; a Keystore-backed `android-native-keyring-store` can be added once the Gradle project exists); phone layout: top bar + four role-aware bottom tabs + "More" sheet, lists as cards with sort, scrolling dialogs, 44 px touch targets, phone-aware Setup screen; notifications via SSE + the notification plugin's Android channel; acceptance flow (Leasing login → unit → tenant response → follow-up) verified at 375×812. **Open (needs the Android SDK/NDK on a build machine):** `tauri android init`, cleartext manifest flag, keystore + signed APK/AAB, device testing on the org's phones, MDM/Play distribution (Q14). | Leasing user completes login → view unit → record tenant response → add follow-up on a phone | 2 wk |
 
-**Total ≈ 14–15 weeks** for Windows (one developer), **+2 weeks** for Android. Critical path: Phase 0 → 2 → 4 → 5 → 6 → 8 → 9.
+**Total ≈ 14–15 weeks** for Windows (one developer), **+2 weeks** for Android. Critical path: Phase 0 → 2 → 4 → 5 → 6 → 8 → 9. Remaining work is the external/launch list above.
 
 ---
 

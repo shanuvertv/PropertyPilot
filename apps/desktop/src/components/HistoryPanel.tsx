@@ -36,13 +36,16 @@ export function AuditList({ rows, loading }: { rows: AuditEntry[] | undefined; l
           <li key={a.id}>
             <button
               type="button"
-              className={cn("flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px]", hasDiff && "hover:bg-muted/50")}
+              className={cn(
+                "flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2.5 text-left text-[13px] md:flex-nowrap",
+                hasDiff && "hover:bg-muted/50",
+              )}
               onClick={() => hasDiff && setOpen(expanded ? null : a.id)}
             >
-              <span className="w-36 shrink-0 tabular-nums text-muted-foreground">{formatDateTime(a.createdAt)}</span>
-              <span className="w-36 shrink-0 truncate">{a.actorName ?? "System"}</span>
-              <span className="flex-1 font-medium">{actionLabel(a.action)}</span>
-              <span className="text-[11.5px] text-muted-foreground">{a.entityType.replace("_", " ")}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground md:w-36">{formatDateTime(a.createdAt)}</span>
+              <span className="min-w-0 truncate md:w-36 md:shrink-0">{a.actorName ?? "System"}</span>
+              <span className="basis-full font-medium md:flex-1 md:basis-auto">{actionLabel(a.action)}</span>
+              <span className="text-[11.5px] text-muted-foreground max-md:hidden">{a.entityType.replace("_", " ")}</span>
             </button>
             {expanded && (
               <div className="grid gap-3 border-t bg-muted/30 px-4 py-3 text-[12px] md:grid-cols-2">

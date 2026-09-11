@@ -1,10 +1,13 @@
-//! SMTP fallback provider (Microsoft 365 SMTP AUTH or any relay) via `lettre`.
+//! SMTP provider (any mailbox: Microsoft 365 SMTP AUTH, Google Workspace, cPanel, Zoho…)
+//! via `lettre`, with an optional copy of each sent message into the mailbox's IMAP
+//! Sent folder so the team's mail client shows what PropertyPilot sent.
 
 use async_trait::async_trait;
 use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 
+use super::imap_sent::{append_to_sent, ImapSentConfig};
 use super::mail::{MailError, MailProvider, OutboundMail, SendReceipt};
 
 #[derive(Debug, Clone)]
@@ -17,11 +20,14 @@ pub struct SmtpConfig {
     pub from_address: String,
     /// STARTTLS (587) when true; implicit TLS (465) when false.
     pub starttls: bool,
+    /// When set, every sent message is also appended to this IMAP account's Sent folder.
+    pub imap_sent: Option<ImapSentConfig>,
 }
 
 pub struct SmtpMail {
     transport: AsyncSmtpTransport<Tokio1Executor>,
     from: Mailbox,
+    imap_sent: Option<ImapSentConfig>,
 }
 
 impl SmtpMail {
@@ -42,6 +48,7 @@ impl SmtpMail {
         Ok(Self {
             transport: builder.build(),
             from,
+            imap_sent: cfg.imap_sent.clone(),
         })
     }
 }
@@ -79,12 +86,23 @@ impl MailProvider for SmtpMail {
         let email = msg
             .multipart(part)
             .map_err(|e| MailError::Rejected(e.to_string()))?;
+        let raw = email.formatted();
         let res = self
             .transport
             .send(email)
             .await
             .map_err(|e| MailError::Unavailable(e.to_string()))?;
         let id = res.message().next().map(|s| s.to_string());
+        if let Some(imap) = self.imap_sent.clone() {
+            // Best effort, off the async runtime: the message is already on its way.
+            let subject = mail.subject.clone();
+            tokio::task::spawn_blocking(move || match append_to_sent(&imap, &raw) {
+                Ok(folder) => tracing::debug!(%subject, folder, "copied to IMAP Sent folder"),
+                Err(e) => {
+                    tracing::warn!(%subject, error = %e, "could not copy to IMAP Sent folder")
+                }
+            });
+        }
         Ok(SendReceipt {
             provider_message_id: id,
         })

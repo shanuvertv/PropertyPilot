@@ -128,3 +128,34 @@
     @apply font-sans;
     }
 }
+
+/* A grid with no column template at the current breakpoint (`grid sm:grid-cols-2`) gets one
+   `minmax(0, 1fr)` column instead of the browser's `auto`, so long unbreakable content
+   (mono text, nowrap rows) scrolls inside its card rather than widening the page on phones.
+   Explicit `grid-cols-*` utilities still win (they live in the utilities layer). */
+@layer base {
+    .grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Touch screens (the Android build): 44 px targets and 16 px inputs, without loosening the desktop density. */
+@media (pointer: coarse) {
+    button:not([data-slot="checkbox"]),
+    [role="button"],
+    [role="tab"],
+    select,
+    textarea,
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+        min-height: 44px;
+    }
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+    select,
+    textarea {
+        font-size: max(16px, 1em);
+    }
+    a[role="menuitem"],
+    nav a {
+        min-height: 44px;
+    }
+}

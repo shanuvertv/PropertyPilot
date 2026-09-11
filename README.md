@@ -1,9 +1,9 @@
 # PropertyPilot
 
-Rental contract renewal management for a leasing department — a Windows desktop app
-(Tauri 2 + Rust + React) talking to a small Rust API server that owns PostgreSQL and runs
-the daily expiry sweep, reminders and email queue. An Android build on the same codebase
-is the next phase. Not an accounting system.
+Rental contract renewal management for a leasing department — a Windows desktop app and an
+Android app (Tauri 2 + Rust, one shared React UI) talking to a small Rust API server that
+owns PostgreSQL and runs the daily expiry sweep, reminders and email queue. Not an
+accounting system.
 
 See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 
@@ -20,6 +20,8 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Reports (5) with Excel/PDF export; full audit trail with per-record history
 - Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix)
 - Excel import of an existing tenant list (preview, then commit; safe to re-run)
+- Android app: the same screens with bottom tabs and card lists; token kept in the app's
+  private storage; works over the LAN or the internet (HTTPS)
 
 ## Layout
 
@@ -70,6 +72,46 @@ cargo test --workspace            # core/services unit tests need no database
 cd apps/desktop && npm run typecheck && npm test && npm run build
 ```
 
+## Android app
+
+The Android build is the same React UI in a Tauri 2 Android shell (`apps/desktop`), so every
+screen and permission rule is shared. Below 768 px the shell switches to a top bar, four bottom
+tabs (the role's most-used modules) and a "More" sheet with the full module list; lists render
+as cards; dialogs scroll; touch targets grow to 44 px.
+
+Prerequisites (once, on the build machine): [Android Studio](https://developer.android.com/studio)
+with the SDK Platform 34+, *NDK (Side by side)* and *Android SDK Command-line Tools*, a JDK 17,
+and the environment variables `ANDROID_HOME` (e.g. `%LOCALAPPDATA%\Android\Sdk`) and
+`NDK_HOME` (`%ANDROID_HOME%\ndk\<version>`). Then:
+
+```bash
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+cd apps/desktop
+npm run tauri android init            # generates src-tauri/gen/android (commit it)
+```
+
+After `init`, allow plain-HTTP servers on the office LAN by adding
+`android:usesCleartextTraffic="true"` to the `<application>` element in
+`src-tauri/gen/android/app/src/main/AndroidManifest.xml` (not needed if the server is only
+reached over HTTPS). Then:
+
+```bash
+npm run tauri android dev             # runs on the connected phone / emulator with hot reload
+npm run tauri android build --apk     # release APK under src-tauri/gen/android/app/build/outputs/apk
+npm run tauri android build --aab     # Play Store bundle
+```
+
+Release builds must be signed: create a keystore once
+(`keytool -genkey -v -keystore propertypilot.jks -keyalg RSA -keysize 2048 -validity 10000 -alias propertypilot`),
+keep it out of git, and follow the Tauri guide to reference it from
+`gen/android/keystore.properties` and `app/build.gradle.kts`. Distribute the APK through the
+organisation's MDM or as a direct download; the Play Store needs the AAB.
+
+On the phone, the Setup screen asks for the server address: the public HTTPS address
+(see [deploy/lightsail.md](deploy/lightsail.md)) or `http://<server-ip>:8787` on the office
+Wi-Fi. The session token is stored in the app's private data directory (Android sandboxes it
+per app); notifications use the Android notification channel via the Tauri notification plugin.
+
 ## Build the Windows installer
 
 ```bash
@@ -93,10 +135,19 @@ Read from the environment, a `.env` in the working directory, or a `.env` next t
 | `TLS_CERT`/`TLS_KEY`| —                    | PEM pair; when both are set the server serves HTTPS itself |
 | `MAIL_PROVIDER`     | `log`                | `log` (print only), `smtp` or `graph`                      |
 | `MAIL_FROM_NAME`/`MAIL_FROM_ADDRESS` | —   | Sender shown on outgoing mail                              |
-| `SMTP_HOST/PORT/USERNAME/PASSWORD/STARTTLS` | — | SMTP provider settings                              |
+| `SMTP_HOST/PORT/USERNAME/PASSWORD/STARTTLS` | — | SMTP provider settings (any mailbox: Microsoft 365, Google Workspace, cPanel…) |
+| `IMAP_HOST/PORT/USERNAME/PASSWORD/SENT_FOLDER` | — | Optional: also file each sent message in that mailbox's Sent folder over IMAP |
 | `GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET/SENDER` | — | Microsoft Graph app (client credentials, `Mail.Send`) |
 
-## Deploy the server as a Windows Service
+## Deploy the server on AWS Lightsail (planned hosting)
+
+The intended production layout is a Lightsail managed PostgreSQL database plus a small
+Lightsail Linux instance running `renewal-server` behind Caddy (automatic HTTPS). Both the
+Windows and Android apps then use `https://<your-host>` on the Setup screen. Step by step:
+[deploy/lightsail.md](deploy/lightsail.md); supporting files: [deploy/renewal-server.service](deploy/renewal-server.service),
+[deploy/Caddyfile](deploy/Caddyfile), and the container image in [Dockerfile](Dockerfile).
+
+## Deploy the server as a Windows Service (on-premises alternative)
 
 On the server machine (PostgreSQL reachable, elevated PowerShell):
 
@@ -114,6 +165,16 @@ upgrade; `installers\uninstall-server.ps1` removes the service (the database is 
 Point the desktop app at `http://<server>:8787` (or `https://` when TLS is configured) on
 its Setup screen. Alternatives: Docker (`docker-compose.yml`) or any host that can run
 the static binary — the server has no other dependencies.
+
+### Sending from your own mailbox
+
+Set `MAIL_PROVIDER=smtp` with the mailbox's SMTP settings — the same account you read over
+IMAP (Microsoft 365: `smtp.office365.com:587`, STARTTLS, SMTP AUTH enabled on the mailbox;
+Google Workspace: `smtp.gmail.com:587` with an app password; cPanel/Zoho: the host's mail
+server). IMAP itself only reads mail, so it cannot send — but with `IMAP_HOST` set the server
+appends a copy of every message it sends to the mailbox's Sent folder (auto-detected, or
+`IMAP_SENT_FOLDER`), so Outlook / the phone's mail app show the notices too. Microsoft Graph
+remains available for tenants that disable SMTP AUTH.
 
 ## Operations runbook
 

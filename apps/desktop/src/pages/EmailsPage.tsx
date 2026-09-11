@@ -46,7 +46,7 @@ export function EmailsPage() {
   const columns: Column<EmailMessage>[] = [
     { key: "date", header: "Date", render: (m) => <span className="tabular-nums">{formatDateTime(m.sentAt ?? m.queuedAt)}</span> },
     { key: "to", header: "Recipient", render: (m) => <span className="line-clamp-1 max-w-[220px]">{m.to.join(", ")}</span> },
-    { key: "subject", header: "Subject", render: (m) => <span className="line-clamp-1 max-w-[320px] font-medium">{m.subject}</span> },
+    { key: "subject", header: "Subject", card: "title", render: (m) => <span className="line-clamp-2 max-w-[320px] font-medium">{m.subject}</span> },
     { key: "type", header: "Email type", render: (m) => templates.data?.find((t) => t.key === m.emailType)?.name ?? m.emailType },
     { key: "tenant", header: "Tenant", render: (m) => (m.tenantId ? <Link to={`/tenants/${m.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{m.tenantName}</Link> : "—") },
     { key: "by", header: "Sent by", render: (m) => m.sentByName ?? "—" },

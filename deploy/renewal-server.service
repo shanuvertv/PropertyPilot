@@ -1,0 +1,26 @@
+# systemd unit for renewal-server on a Linux host (e.g. an AWS Lightsail instance).
+#   sudo cp renewal-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now renewal-server
+[Unit]
+Description=PropertyPilot server (rental contract renewals API + scheduler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=propertypilot
+Group=propertypilot
+WorkingDirectory=/opt/propertypilot
+EnvironmentFile=/opt/propertypilot/.env
+ExecStart=/opt/propertypilot/renewal-server
+Restart=on-failure
+RestartSec=5
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/propertypilot/logs
+
+[Install]
+WantedBy=multi-user.target

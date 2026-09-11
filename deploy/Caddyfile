@@ -1,0 +1,9 @@
+# Reverse proxy with automatic Let's Encrypt HTTPS in front of renewal-server.
+# Replace the host name, then: sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+renewals.example.com {
+    encode gzip
+    reverse_proxy 127.0.0.1:8787 {
+        # Server-sent events (/api/events) must stream, not buffer.
+        flush_interval -1
+    }
+}

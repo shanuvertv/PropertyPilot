@@ -52,7 +52,7 @@ export function NoticesPage() {
     { key: "status", header: "Notice status", sort: "status", render: (c) => <NoticeStatusBadge status={c.noticeStatus} /> },
     { key: "case", header: "Case", render: (c) => <RenewalStatusBadge status={c.status} /> },
     { key: "assigned", header: "Employee", render: (c) => c.assignedEmployeeName ?? "—" },
-    { key: "actions", header: "", className: "text-right", render: (c) => <span onClick={(e) => e.stopPropagation()}><Button size="xs" variant="ghost" onClick={() => navigate(`/renewals/${c.id}`)}>Open</Button></span> },
+    { key: "actions", header: "", className: "text-right", card: "hidden", render: (c) => <span onClick={(e) => e.stopPropagation()}><Button size="xs" variant="ghost" onClick={() => navigate(`/renewals/${c.id}`)}>Open</Button></span> },
   ];
 
   return (

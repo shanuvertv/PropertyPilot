@@ -68,6 +68,20 @@ impl Config {
                     starttls: env("SMTP_STARTTLS")
                         .map(|v| !matches!(v.as_str(), "0" | "off" | "false"))
                         .unwrap_or(true),
+                    imap_sent: match env("IMAP_HOST") {
+                        Some(host) => Some(renewal_services::providers::ImapSentConfig {
+                            host,
+                            port: env("IMAP_PORT").and_then(|p| p.parse().ok()).unwrap_or(993),
+                            username: env("IMAP_USERNAME")
+                                .or_else(|| env("SMTP_USERNAME"))
+                                .ok_or_else(|| anyhow::anyhow!("IMAP_USERNAME (or SMTP_USERNAME) is required with IMAP_HOST"))?,
+                            password: env("IMAP_PASSWORD")
+                                .or_else(|| env("SMTP_PASSWORD"))
+                                .ok_or_else(|| anyhow::anyhow!("IMAP_PASSWORD (or SMTP_PASSWORD) is required with IMAP_HOST"))?,
+                            folder: env("IMAP_SENT_FOLDER"),
+                        }),
+                        None => None,
+                    },
                 };
                 let sender = cfg.from_address.clone();
                 (MailConfig::Smtp(cfg), sender)

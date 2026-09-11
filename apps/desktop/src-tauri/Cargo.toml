@@ -1,6 +1,6 @@
 [package]
 name = "renewal-desktop"
-description = "Tauri shell for the Rental Contract Renewal Management System (Windows now, Android later)."
+description = "PropertyPilot client shell (Windows desktop and Android) around the shared React UI."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -23,6 +23,8 @@ tauri-plugin-notification = "2"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-# Secure store for the API URL + session token: Windows Credential Manager now;
-# enable `android-native-keyring-store` in the Android target when that build is added.
+
+# Secure store for the API URL + session token: OS credential manager on desktop.
+# Android uses the app-private data directory instead (see src/secure.rs).
+[target.'cfg(not(target_os = "android"))'.dependencies]
 keyring.workspace = true

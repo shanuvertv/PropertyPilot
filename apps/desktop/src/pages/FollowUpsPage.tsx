@@ -51,7 +51,7 @@ export function FollowUpsPage() {
       </span>
     ) },
     { key: "type", header: "Type", render: (f) => FOLLOW_UP_TYPE_LABEL[f.followUpType] },
-    { key: "tenant", header: "Tenant", render: (f) => <Link to={`/tenants/${f.tenantId}`} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>{f.tenantName}</Link> },
+    { key: "tenant", header: "Tenant", card: "title", render: (f) => <Link to={`/tenants/${f.tenantId}`} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>{f.tenantName}</Link> },
     { key: "contract", header: "Contract", render: (f) => `${f.contractNumber} · ${f.buildingName} ${f.unitNumbers}` },
     { key: "notes", header: "Notes", render: (f) => <span className="line-clamp-1 max-w-[320px]">{f.notes ?? "—"}</span> },
     { key: "assigned", header: "Assigned", render: (f) => f.assignedEmployeeName ?? "—" },
