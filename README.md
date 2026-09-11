@@ -96,16 +96,31 @@ After `init`, allow plain-HTTP servers on the office LAN by adding
 reached over HTTPS). Then:
 
 ```bash
-npm run tauri android dev             # runs on the connected phone / emulator with hot reload
-npm run tauri android build --apk     # release APK under src-tauri/gen/android/app/build/outputs/apk
-npm run tauri android build --aab     # Play Store bundle
+npm run tauri android dev                       # runs on the connected phone / emulator with hot reload
+npm run tauri android build -- --apk --target aarch64   # release APK (arm64) under src-tauri/gen/android/app/build/outputs/apk
+npm run tauri android build -- --aab            # Play Store bundle, all ABIs
 ```
 
-Release builds must be signed: create a keystore once
-(`keytool -genkey -v -keystore propertypilot.jks -keyalg RSA -keysize 2048 -validity 10000 -alias propertypilot`),
-keep it out of git, and follow the Tauri guide to reference it from
-`gen/android/keystore.properties` and `app/build.gradle.kts`. Distribute the APK through the
-organisation's MDM or as a direct download; the Play Store needs the AAB.
+`src-tauri/gen/android` is committed (generated once by `tauri android init`); `app/build.gradle.kts`
+carries the release signing config and allows plain `http://` for LAN servers. Release builds are
+signed with `gen/android/propertypilot-release.jks` via `gen/android/keystore.properties`
+(`storeFile`, `password`, `keyAlias`) — both git-ignored. **Back the keystore and its password up:**
+phones only accept updates signed with the same key. To create a new one:
+`keytool -genkeypair -keystore propertypilot-release.jks -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 -alias propertypilot`.
+
+On Windows the Tauri CLI links the built library into the Gradle project with a symlink, which
+needs *Settings → System → For developers → Developer Mode* (or an elevated shell). Without it the
+Rust step succeeds and the link fails; finish the build by hand:
+
+```bash
+mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
+cp ../../target/aarch64-linux-android/release/librenewal_desktop_lib.so src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
+cd src-tauri/gen/android && ./gradlew assembleArm64Release -x rustBuildArm64Release
+```
+
+Distribute the APK through the organisation's MDM or as a direct download (phones need
+"install from unknown sources" for the first install); the Play Store needs the AAB. Android Studio
+itself is optional — the SDK command-line tools, a JDK 17 and the NDK are enough.
 
 On the phone, the Setup screen asks for the server address: the public HTTPS address
 (see [deploy/lightsail.md](deploy/lightsail.md)) or `http://<server-ip>:8787` on the office
