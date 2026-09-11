@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/api",
+    "crates/db",
+    "crates/services",
+    "apps/server",
+    "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Proprietary"
+publish = false
+
+[workspace.dependencies]
+# internal
+renewal-core = { path = "crates/core" }
+renewal-api = { path = "crates/api" }
+renewal-db = { path = "crates/db" }
+renewal-services = { path = "crates/services" }
+
+# async + db
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls-ring", "postgres", "chrono", "uuid", "json", "migrate", "macros"] }
+async-trait = "0.1"
+
+# serialization / types
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+futures-util = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+strum = { version = "0.28", features = ["derive"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+
+# errors / logging
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# http server
+axum = { version = "0.8", features = ["multipart"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+tracing-appender = "0.2"
+windows-service = "0.8"
+
+# security
+argon2 = { version = "0.5", features = ["std"] }
+keyring = "4"
+sha2 = "0.10"
+hex = "0.4"
+hostname = "0.4"
+
+# scheduling
+tokio-cron-scheduler = "0.15"
+dotenvy = "0.15"
+
+# email, templates, pdf
+handlebars = "6"
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls-tls", "pool"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+typst-as-lib = { version = "0.16", features = ["typst-kit-fonts", "typst-kit-embed-fonts"] }
+typst = "0.15"
+typst-layout = "0.15"
+typst-pdf = "0.15"
+rust_xlsxwriter = "0.99"
+calamine = { version = "0.36", features = ["dates"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

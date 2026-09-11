@@ -1,0 +1,35 @@
+[package]
+name = "renewal-services"
+description = "Use-cases that combine domain rules with the database: auth, sessions, users, providers."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+renewal-core.workspace = true
+renewal-db.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+strum.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+argon2.workspace = true
+sha2.workspace = true
+hex.workspace = true
+handlebars.workspace = true
+base64 = "0.22"
+lettre.workspace = true
+reqwest.workspace = true
+typst-as-lib.workspace = true
+typst.workspace = true
+typst-layout.workspace = true
+typst-pdf.workspace = true
+rust_xlsxwriter.workspace = true
+calamine.workspace = true

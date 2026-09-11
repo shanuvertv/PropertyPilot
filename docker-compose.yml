@@ -1,0 +1,21 @@
+# Dev database only. Production runs PostgreSQL on an office server or Azure (see PLAN.md §4).
+services:
+  postgres:
+    image: postgres:16
+    container_name: renewal-postgres
+    environment:
+      POSTGRES_USER: renewal
+      POSTGRES_PASSWORD: renewal
+      POSTGRES_DB: renewal
+    ports:
+      - "5432:5432"
+    volumes:
+      - renewal-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U renewal -d renewal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  renewal-pgdata:

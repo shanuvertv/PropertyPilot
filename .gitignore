@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Tauri generated
+apps/desktop/src-tauri/gen/schemas/
+
+# Environment / secrets
+.env
+*.pem
+*.pfx
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.log
+
+# Tauri build output
+apps/desktop/src-tauri/target/
+
+# Local session files
+.claude/

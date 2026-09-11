@@ -1,0 +1,22 @@
+[package]
+name = "renewal-api"
+description = "Request/response types shared by the server and every client (Windows, Android)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Derive `specta::Type` so the DTOs can be exported to TypeScript (Phase 1 follow-up).
+specta = ["dep:specta", "renewal-core/specta"]
+
+[dependencies]
+renewal-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
