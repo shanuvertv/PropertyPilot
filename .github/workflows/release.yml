@@ -1,0 +1,45 @@
+name: Release server binary
+
+# Builds the Linux x86_64 renewal-server used on Lightsail (deploy/lightsail.md).
+# Runs on every push to main (artifact) and publishes a GitHub Release on v* tags.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-server:
+    name: renewal-server (Linux x86_64)
+    # 22.04 keeps the glibc requirement low enough for Ubuntu 22.04 and 24.04 instances.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p renewal-server
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp target/release/renewal-server dist/
+          cp deploy/renewal-server.service deploy/Caddyfile deploy/lightsail.md .env.example dist/
+          tar -C dist -czf renewal-server-linux-x86_64.tar.gz .
+          sha256sum renewal-server-linux-x86_64.tar.gz > renewal-server-linux-x86_64.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renewal-server-linux-x86_64
+          path: |
+            renewal-server-linux-x86_64.tar.gz
+            renewal-server-linux-x86_64.tar.gz.sha256
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            renewal-server-linux-x86_64.tar.gz
+            renewal-server-linux-x86_64.tar.gz.sha256

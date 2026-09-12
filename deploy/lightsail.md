@@ -37,19 +37,24 @@ Browser dev ─┘        (Caddy: TLS + reverse proxy)      scheduler · email q
 
 ## 3. Install the server
 
-Build the release binary (on any Linux x86_64 machine, or in GitHub Actions) and copy it up:
+GitHub Actions builds the Linux binary on every push to `main` (workflow *Release server binary*;
+download `renewal-server-linux-x86_64` from the run's artifacts) and attaches it to a GitHub
+Release when a `v*` tag is pushed. On the instance (Ubuntu), fetch the release tarball:
 
 ```bash
-cargo build --release -p renewal-server
-scp target/release/renewal-server deploy/renewal-server.service deploy/Caddyfile ubuntu@<static-ip>:
+curl -fsSLo renewal-server.tar.gz   https://github.com/shanuvertv/PropertyPilot/releases/latest/download/renewal-server-linux-x86_64.tar.gz
+mkdir -p ~/pp && tar -C ~/pp -xzf renewal-server.tar.gz && ls ~/pp
 ```
 
-On the instance:
+(Or build it yourself on any Linux x86_64 machine with `cargo build --release -p renewal-server`
+and `scp` the binary plus the two files from `deploy/`.)
+
+Then install it:
 
 ```bash
 sudo useradd --system --home /opt/propertypilot --create-home propertypilot
 sudo mkdir -p /opt/propertypilot/logs
-sudo mv ~/renewal-server /opt/propertypilot/ && sudo chmod 755 /opt/propertypilot/renewal-server
+sudo mv ~/pp/renewal-server /opt/propertypilot/ && sudo chmod 755 /opt/propertypilot/renewal-server
 sudo tee /opt/propertypilot/.env >/dev/null <<'ENV'
 DATABASE_URL=postgresql://renewal:CHANGE-ME@<db-endpoint>:5432/renewal?sslmode=require
 BIND_ADDR=127.0.0.1:8787
@@ -67,7 +72,7 @@ SMTP_PASSWORD=app-password
 IMAP_HOST=outlook.office365.com
 ENV
 sudo chown -R propertypilot:propertypilot /opt/propertypilot && sudo chmod 600 /opt/propertypilot/.env
-sudo cp ~/renewal-server.service /etc/systemd/system/
+sudo cp ~/pp/renewal-server.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now renewal-server
 curl -s http://127.0.0.1:8787/api/health      # {"ok":true,...}
 ```
@@ -81,7 +86,7 @@ attach the database's private endpoint and let Lightsail terminate HTTPS.
 
 ```bash
 sudo apt-get install -y caddy
-sudo cp ~/Caddyfile /etc/caddy/Caddyfile     # edit the host name first
+sudo cp ~/pp/Caddyfile /etc/caddy/Caddyfile  # edit the host name first
 sudo systemctl reload caddy
 curl -s https://renewals.example.com/api/health
 ```
