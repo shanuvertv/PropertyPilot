@@ -27,6 +27,23 @@ Browser dev ─┘        (Caddy: TLS + reverse proxy)      scheduler · email q
 5. Backups: Lightsail databases take automatic daily snapshots (7-day retention by default);
    enable point-in-time restore in the database's *Snapshots & restore* tab.
 
+### 1b. Alternative: PostgreSQL on the same instance (no managed database)
+
+For a small team the database can simply live on the instance — about half the monthly cost,
+at the price of doing backups yourself. Skip section 1 and, after creating the instance (2):
+
+```bash
+sudo apt-get install -y postgresql
+sudo -u postgres psql -c "CREATE ROLE renewal LOGIN PASSWORD 'CHANGE-ME';"                        -c "CREATE DATABASE renewal OWNER renewal;"
+# nightly dump, kept 14 days (restore command is inside the script)
+sudo cp ~/pp/backup-db.sh /usr/local/bin/ && sudo chmod 755 /usr/local/bin/backup-db.sh
+echo '15 1 * * * root /usr/local/bin/backup-db.sh' | sudo tee /etc/cron.d/propertypilot-backup
+```
+
+Use `DATABASE_URL=postgresql://renewal:CHANGE-ME@localhost:5432/renewal` in `.env` (no `sslmode`
+needed on localhost), and enable the instance's automatic snapshots in Lightsail as a second
+safety net. Moving to the managed database later is a `pg_dump` + `pg_restore` and one `.env` line.
+
 ## 2. Instance
 
 1. Lightsail → Instances → *Create instance* → Linux, **Ubuntu 24.04**, 1 GB plan (2 GB if you

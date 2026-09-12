@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir -p dist
           cp target/release/renewal-server dist/
-          cp deploy/renewal-server.service deploy/Caddyfile deploy/lightsail.md .env.example dist/
+          cp deploy/renewal-server.service deploy/Caddyfile deploy/backup-db.sh deploy/lightsail.md .env.example dist/
           tar -C dist -czf renewal-server-linux-x86_64.tar.gz .
           sha256sum renewal-server-linux-x86_64.tar.gz > renewal-server-linux-x86_64.tar.gz.sha256
       - uses: actions/upload-artifact@v4
