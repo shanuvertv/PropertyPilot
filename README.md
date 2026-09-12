@@ -118,6 +118,15 @@ cp ../../target/aarch64-linux-android/release/librenewal_desktop_lib.so src-taur
 cd src-tauri/gen/android && ./gradlew assembleArm64Release -x rustBuildArm64Release
 ```
 
+`MainActivity.kt` pads the web view by the system-bar and keyboard insets: Android 15+ forces
+edge-to-edge for targetSdk 35+ and WebView does not pass those insets to CSS, so without it the
+bottom tabs sit under the gesture bar.
+
+Emulator (optional): `sdkmanager "system-images;android-36;google_apis;x86_64"`, create a device with
+`avdmanager create avd -n PropertyPilotTest -k "system-images;android-36;google_apis;x86_64" -d pixel_7`,
+start it, `adb install -r` the APK (the Google APIs image runs arm64 APKs through translation) and use
+`http://10.0.2.2:8787` as the server address — that is the host PC seen from the emulator.
+
 Distribute the APK through the organisation's MDM or as a direct download (phones need
 "install from unknown sources" for the first install); the Play Store needs the AAB. Android Studio
 itself is optional — the SDK command-line tools, a JDK 17 and the NDK are enough.
