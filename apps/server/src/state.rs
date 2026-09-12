@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use renewal_db::PgPool;
-use renewal_services::providers::{MailProvider, PgStorage, StorageProvider};
+use renewal_services::providers::{DynamicMail, MailProvider, PgStorage, StorageProvider};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
@@ -35,8 +35,9 @@ impl LiveEvent {
 pub struct AppState {
     pub pool: PgPool,
     pub storage: Arc<dyn StorageProvider>,
+    /// Sends through the mailbox saved in Settings, or the environment's provider until then.
     pub mail: Arc<dyn MailProvider>,
-    pub mail_sender: String,
+    pub mail_dynamic: Arc<DynamicMail>,
     pub timezone: String,
     pub events: broadcast::Sender<LiveEvent>,
     /// 10 login attempts per 15 minutes per (ip, email).
@@ -51,6 +52,8 @@ impl AppState {
         timezone: String,
     ) -> Self {
         let storage: Arc<dyn StorageProvider> = Arc::new(PgStorage::new(pool.clone()));
+        let mail_dynamic = Arc::new(DynamicMail::new(pool.clone(), mail, mail_sender));
+        let mail: Arc<dyn MailProvider> = mail_dynamic.clone();
         let (events, _) = broadcast::channel(256);
         let login_limiter = Arc::new(RateLimiter::new(
             10,
@@ -60,7 +63,7 @@ impl AppState {
             pool,
             storage,
             mail,
-            mail_sender,
+            mail_dynamic,
             timezone,
             events,
             login_limiter,

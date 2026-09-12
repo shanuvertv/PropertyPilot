@@ -175,9 +175,11 @@ pub async fn mail_status(
     .fetch_one(&state.pool)
     .await
     .map_err(renewal_services::ServiceError::Db)?;
+    let d = state.mail_dynamic.describe().await;
     Ok(Json(MailStatus {
-        provider: state.mail.name().to_owned(),
-        sender: state.mail_sender.clone(),
+        provider: d.provider,
+        sender: d.sender,
+        from_settings: d.from_settings,
         queued,
         failed,
     }))

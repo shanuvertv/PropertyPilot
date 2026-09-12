@@ -69,6 +69,9 @@ import type {
   ReportTable,
   ImportPreview,
   ImportResult,
+  MailConfigInput,
+  MailConfigView,
+  MailTestResult,
 } from "./types-domain";
 
 /** Thrown for any non-2xx response, or when the server cannot be reached at all. */
@@ -460,6 +463,17 @@ export class ApiClient {
   }
   auditFor(entityType: string, id: string) {
     return this.request<AuditEntry[]>("GET", `/api/audit/${entityType}/${id}`);
+  }
+
+  // ---- Settings → Email sending
+  mailSettings() {
+    return this.request<MailConfigView>("GET", "/api/settings/mail");
+  }
+  saveMailSettings(input: MailConfigInput) {
+    return this.request<MailConfigView>("PUT", "/api/settings/mail", input);
+  }
+  sendTestMail(to: string) {
+    return this.request<MailTestResult>("POST", "/api/settings/mail/test", { to });
   }
 
   // ---- passwords

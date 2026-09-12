@@ -17,6 +17,7 @@ import { EmailTemplatesCard } from "@/pages/settings/EmailTemplatesCard";
 import { OrganisationCard, ReminderScheduleCard } from "@/pages/settings/AutomationCards";
 import { AuditCard } from "@/pages/settings/AuditCard";
 import { ImportCard } from "@/pages/settings/ImportCard";
+import { MailSettingsCard } from "@/pages/settings/MailSettingsCard";
 import { ResetPasswordDialog } from "@/components/PasswordDialogs";
 
 function formatWhen(iso: string | null | undefined): string {
@@ -60,7 +61,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Users and roles, renewal checklist, email templates, automation status." />
+      <PageHeader title="Settings" description="Users and roles, tenant-list import, renewal checklist, email sending and templates, automation." />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -200,6 +201,8 @@ export function SettingsPage() {
           <OrganisationCard />
 
           <ReminderScheduleCard />
+
+          <MailSettingsCard />
 
           <EmailTemplatesCard />
 

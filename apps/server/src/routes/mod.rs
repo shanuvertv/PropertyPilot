@@ -184,6 +184,14 @@ pub fn router(state: AppState) -> Router {
             get(automation::get_org).put(automation::save_org),
         )
         .route(
+            "/api/settings/mail",
+            get(automation::mail_settings_get).put(automation::mail_settings_put),
+        )
+        .route(
+            "/api/settings/mail/test",
+            post(automation::mail_settings_test),
+        )
+        .route(
             "/api/settings/reminder-rules",
             get(automation::get_rules).put(automation::save_rules),
         )

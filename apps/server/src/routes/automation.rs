@@ -8,6 +8,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use futures_util::stream::Stream;
 use renewal_api::*;
+use renewal_services::mail_settings::{self, MailConfigInput, MailConfigView};
 use renewal_services::pdf::Letterhead;
 use renewal_services::settings::{self, OrgSettings, RuleDraft};
 use renewal_services::{auth, notifications, sweep};
@@ -199,4 +200,37 @@ pub async fn run_sweep(
     state.publish(LiveEvent::notifications(None));
     state.publish(LiveEvent::data());
     Ok(Json(dto::sweep_summary(&s)))
+}
+
+// ---------------------------------------------------------------- mail settings (Settings → Email sending)
+
+pub async fn mail_settings_get(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+) -> Result<Json<MailConfigView>, ApiFailure> {
+    Ok(Json(mail_settings::view(&state.pool, &caller).await?))
+}
+
+pub async fn mail_settings_put(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Json(input): Json<MailConfigInput>,
+) -> Result<Json<MailConfigView>, ApiFailure> {
+    Ok(Json(
+        mail_settings::save(&state.pool, &caller, input).await?,
+    ))
+}
+
+pub async fn mail_settings_test(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Json(req): Json<MailTestRequest>,
+) -> Result<Json<MailTestResult>, ApiFailure> {
+    let org = settings::org(&state.pool).await?;
+    let receipt = mail_settings::send_test(&caller, &state.mail, &req.to, &org.org_name).await?;
+    let d = state.mail_dynamic.describe().await;
+    Ok(Json(MailTestResult {
+        provider: d.provider,
+        provider_message_id: receipt.provider_message_id,
+    }))
 }

@@ -61,45 +61,41 @@ export function ReminderScheduleCard() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="text-[11px] tracking-[0.04em] text-muted-foreground uppercase">
-              <tr>
-                <th className="pb-1.5 pr-2 text-left font-medium">Days before</th>
-                <th className="pb-1.5 pr-2 text-left font-medium">What happens</th>
-                <th className="pb-1.5 px-2 font-medium">In-app</th>
-                <th className="pb-1.5 px-2 font-medium">Email employee</th>
-                <th className="pb-1.5 px-2 font-medium">Mark urgent</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((r, idx) => (
-                <tr key={r.id ?? `new-${idx}`}>
-                  <td className="py-1 pr-2">
-                    <Input type="number" min={0} max={730} value={r.daysBefore} onChange={(e) => patch(idx, { daysBefore: Number(e.target.value) })} className="w-24 tabular-nums" aria-label="Days before expiry" />
-                  </td>
-                  <td className="py-1 pr-2">
-                    <Input value={r.label} onChange={(e) => patch(idx, { label: e.target.value })} aria-label="Label" />
-                  </td>
-                  <td className="py-1 px-2 text-center">
-                    <Checkbox checked={r.notifyInApp} onCheckedChange={(c) => patch(idx, { notifyInApp: c === true })} aria-label="In-app" />
-                  </td>
-                  <td className="py-1 px-2 text-center">
-                    <Checkbox checked={r.emailAssignedEmployee} onCheckedChange={(c) => patch(idx, { emailAssignedEmployee: c === true })} aria-label="Email" />
-                  </td>
-                  <td className="py-1 px-2 text-center">
-                    <Checkbox checked={r.markUrgent} onCheckedChange={(c) => patch(idx, { markUrgent: c === true })} aria-label="Urgent" />
-                  </td>
-                  <td className="py-1 text-right">
-                    <Button size="icon-xs" variant="ghost" aria-label="Remove" onClick={() => { setItems((l) => l.filter((_, i) => i !== idx)); setDirty(true); }}>
-                      <X />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* One block per milestone: inputs on the first line, the three switches on the second
+            (phones); on wider screens everything sits on one line. */}
+        <div className="flex flex-col divide-y rounded-md border">
+          <div className="hidden grid-cols-[6rem_minmax(0,1fr)_auto_auto_auto_2rem] items-center gap-x-3 px-3 py-1.5 text-[11px] tracking-[0.04em] text-muted-foreground uppercase md:grid">
+            <span>Days before</span>
+            <span>What happens</span>
+            <span className="text-center">In-app</span>
+            <span className="text-center">Email employee</span>
+            <span className="text-center">Mark urgent</span>
+            <span />
+          </div>
+          {items.map((r, idx) => (
+            <div key={r.id ?? `new-${idx}`} className="grid grid-cols-[6rem_minmax(0,1fr)_2rem] items-center gap-x-3 gap-y-2 px-3 py-2 text-[13px] md:grid-cols-[6rem_minmax(0,1fr)_auto_auto_auto_2rem]">
+              <Input type="number" min={0} max={730} value={r.daysBefore} onChange={(e) => patch(idx, { daysBefore: Number(e.target.value) })} className="tabular-nums" aria-label="Days before expiry" />
+              <Input value={r.label} onChange={(e) => patch(idx, { label: e.target.value })} aria-label="Label" placeholder="What happens" />
+              <div className="row-start-1 col-start-3 justify-self-end md:col-start-6">
+                <Button size="icon-xs" variant="ghost" aria-label="Remove" onClick={() => { setItems((l) => l.filter((_, i) => i !== idx)); setDirty(true); }}>
+                  <X />
+                </Button>
+              </div>
+              <label className="col-span-3 flex items-center gap-2 md:col-span-1 md:col-start-3 md:row-start-1 md:justify-center [&>span]:md:sr-only">
+                <Checkbox checked={r.notifyInApp} onCheckedChange={(c) => patch(idx, { notifyInApp: c === true })} aria-label="In-app" />
+                <span className="text-[12.5px] text-muted-foreground">In-app notification</span>
+              </label>
+              <label className="col-span-3 flex items-center gap-2 md:col-span-1 md:col-start-4 md:row-start-1 md:justify-center [&>span]:md:sr-only">
+                <Checkbox checked={r.emailAssignedEmployee} onCheckedChange={(c) => patch(idx, { emailAssignedEmployee: c === true })} aria-label="Email" />
+                <span className="text-[12.5px] text-muted-foreground">Email the assigned employee</span>
+              </label>
+              <label className="col-span-3 flex items-center gap-2 md:col-span-1 md:col-start-5 md:row-start-1 md:justify-center [&>span]:md:sr-only">
+                <Checkbox checked={r.markUrgent} onCheckedChange={(c) => patch(idx, { markUrgent: c === true })} aria-label="Urgent" />
+                <span className="text-[12.5px] text-muted-foreground">Mark as urgent</span>
+              </label>
+            </div>
+          ))}
+          {items.length === 0 && <p className="px-3 py-4 text-center text-[13px] text-muted-foreground">No milestones — nothing will remind the team.</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => { setItems((l) => [...l, { id: null, daysBefore: 45, label: "", notifyInApp: true, emailAssignedEmployee: false, markUrgent: false, active: true }]); setDirty(true); }}>

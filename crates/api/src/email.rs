@@ -188,6 +188,23 @@ pub struct SendNoticeRequest {
 pub struct MailStatus {
     pub provider: String,
     pub sender: String,
+    /// True when the mailbox comes from Settings → Email sending rather than the server `.env`.
+    pub from_settings: bool,
     pub queued: i64,
     pub failed: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct MailTestRequest {
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct MailTestResult {
+    pub provider: String,
+    pub provider_message_id: Option<String>,
 }

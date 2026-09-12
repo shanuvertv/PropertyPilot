@@ -192,13 +192,17 @@ the static binary — the server has no other dependencies.
 
 ### Sending from your own mailbox
 
-Set `MAIL_PROVIDER=smtp` with the mailbox's SMTP settings — the same account you read over
-IMAP (Microsoft 365: `smtp.office365.com:587`, STARTTLS, SMTP AUTH enabled on the mailbox;
-Google Workspace: `smtp.gmail.com:587` with an app password; cPanel/Zoho: the host's mail
-server). IMAP itself only reads mail, so it cannot send — but with `IMAP_HOST` set the server
-appends a copy of every message it sends to the mailbox's Sent folder (auto-detected, or
-`IMAP_SENT_FOLDER`), so Outlook / the phone's mail app show the notices too. Microsoft Graph
-remains available for tenants that disable SMTP AUTH.
+**In the app:** Settings → *Email sending* (Admin). Choose *SMTP*, enter the mailbox's details —
+the same account you read over IMAP or in Outlook (Microsoft 365: `smtp.office365.com`, 587,
+STARTTLS, SMTP AUTH enabled on the mailbox; Google Workspace: `smtp.gmail.com`, 587, an app
+password; cPanel/Zoho hosts: `mail.yourdomain.com`, 465 SSL or 587 STARTTLS) — tick *file sent
+email in the Sent folder* if you want Outlook and phones to show what PropertyPilot sent, save,
+and press *Send test*. The settings live in the database (password included, never returned to
+clients), so every desktop and phone uses the same mailbox and nothing on the server changes.
+
+The `MAIL_*`/`SMTP_*`/`IMAP_*` variables in `.env` are only the fallback used until something
+is saved in the app (the *log* provider prints messages instead of sending — handy for a first
+run). Microsoft Graph remains available through `.env` for tenants that disable SMTP AUTH.
 
 ## Operations runbook
 
@@ -236,7 +240,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Contracts | `contracts`, `contracts/suggest-number`, `contracts/{id}/activate|terminate|assign|renewal`, `contracts/expire-overdue` |
 | Renewals | `renewals`, `renewals/checklist-template`, `renewals/{id}/status|assign|notes|responses|checklist/{item}|complete|follow-ups|notice|notice/pdf|notice/send`, `follow-ups`, `follow-ups/counts` |
 | Email | `email-templates`, `email-templates/placeholders`, `email-templates/{key}/preview`, `emails`, `emails/{id}/retry`, `system/mail` |
-| Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `system/sweep`, `system/status` |
+| Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `settings/mail`, `settings/mail/test`, `system/sweep`, `system/status` |
 | Reports & audit | `reports/{kind}` (`?format=xlsx|pdf`), `audit`, `audit/{entityType}/{id}` |
 | Import | `import/preview`, `import/commit` (multipart `file` = .xlsx) |
 | Dashboard | `dashboard`, `search` |

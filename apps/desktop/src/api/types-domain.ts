@@ -578,8 +578,51 @@ export interface SendNoticeRequest {
 export interface MailStatus {
   provider: string;
   sender: string;
+  fromSettings: boolean;
   queued: number;
   failed: number;
+}
+
+// ---------------------------------------------------------------- Settings → Email sending
+
+export type MailProviderKind = "log" | "smtp";
+export type SmtpSecurity = "starttls" | "ssl";
+
+export interface MailConfigView {
+  configured: boolean;
+  provider: MailProviderKind;
+  fromName: string;
+  fromAddress: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: SmtpSecurity;
+  smtpUsername: string;
+  hasPassword: boolean;
+  imapEnabled: boolean;
+  imapHost: string;
+  imapPort: number;
+  imapSentFolder: string;
+}
+
+export interface MailConfigInput {
+  provider: MailProviderKind;
+  fromName: string;
+  fromAddress: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: SmtpSecurity;
+  smtpUsername: string;
+  /** Omit or leave empty to keep the stored password. */
+  smtpPassword?: string | null;
+  imapEnabled: boolean;
+  imapHost: string;
+  imapPort: number;
+  imapSentFolder: string;
+}
+
+export interface MailTestResult {
+  provider: string;
+  providerMessageId: string | null;
 }
 
 // ---------------------------------------------------------------- automation (crates/api/src/automation.rs)
