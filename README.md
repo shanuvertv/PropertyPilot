@@ -22,6 +22,8 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Excel import of an existing tenant list (preview, then commit; safe to re-run)
 - Android app: the same screens with bottom tabs and card lists; token kept in the app's
   private storage; works over the LAN or the internet (HTTPS)
+- Browser version: the server serves the same UI at `https://<server>/` (set `WEB_DIR` or put
+  the `web/` build next to the executable) — no install needed
 
 ## Layout
 
@@ -157,6 +159,7 @@ Read from the environment, a `.env` in the working directory, or a `.env` next t
 | `RUST_LOG`          | `info,sqlx=warn`     | Log filter                                                 |
 | `LOG_DIR`           | —                    | When set, write daily rolling log files there (services)   |
 | `TLS_CERT`/`TLS_KEY`| —                    | PEM pair; when both are set the server serves HTTPS itself |
+| `WEB_DIR`           | `web/` beside the exe | Built web UI (`apps/desktop/dist`) to serve at `/`; omit to serve a landing page only |
 | `MAIL_PROVIDER`     | `log`                | `log` (print only), `smtp` or `graph`                      |
 | `MAIL_FROM_NAME`/`MAIL_FROM_ADDRESS` | —   | Sender shown on outgoing mail                              |
 | `SMTP_HOST/PORT/USERNAME/PASSWORD/STARTTLS` | — | SMTP provider settings (any mailbox: Microsoft 365, Google Workspace, cPanel…) |

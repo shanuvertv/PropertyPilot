@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.85"
 license = "Proprietary"
@@ -47,7 +47,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # http server
 axum = { version = "0.8", features = ["multipart"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 tracing-appender = "0.2"
 windows-service = "0.8"

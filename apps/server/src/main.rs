@@ -78,7 +78,7 @@ pub async fn run_server(shutdown: impl Future<Output = ()> + Send + 'static) -> 
         config.mail_sender.clone(),
         config.timezone.clone(),
     );
-    let app = routes::router(state.clone());
+    let app = routes::router(state.clone(), config.web_dir.clone());
 
     let scheduler = if config.scheduler {
         Some(scheduler::start(state.clone()).await?)

@@ -35,6 +35,13 @@ interface AppState {
 
 const Ctx = createContext<AppState | null>(null);
 
+function servedByServer(): string | null {
+  if (typeof window === "undefined" || "__TAURI_INTERNALS__" in window) return null;
+  const { protocol, host, port } = window.location;
+  if (!/^https?:$/.test(protocol) || port === "1420") return null;
+  return `${protocol}//${host}`;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [loaded, setLoaded] = useState(false);
@@ -65,7 +72,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const [url, token] = await Promise.all([secureGet(SECURE_KEYS.serverUrl), secureGet(SECURE_KEYS.token)]);
       if (cancelled) return;
       tokenRef.current = token;
-      setServerUrl(url ?? "");
+      // Served by renewal-server itself (the web build at https://<server>/): the server is
+      // wherever the page came from, so skip the Setup screen. Tauri and the Vite dev server
+      // (localhost:1420) still ask for the address.
+      setServerUrl(url ?? servedByServer() ?? "");
       setLoaded(true);
     })();
     return () => {

@@ -18,8 +18,9 @@ mod renewals;
 mod reports;
 mod system;
 mod users;
+mod web;
 
-pub fn router(state: AppState) -> Router {
+pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
     // Bearer tokens, no cookies: a permissive CORS policy is safe and lets the
     // desktop webview (http://tauri.localhost), Android and `vite dev` all call in.
     let cors = CorsLayer::new()
@@ -205,5 +206,6 @@ pub fn router(state: AppState) -> Router {
         )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .fallback_service(web::fallback(web_dir))
         .with_state(state)
 }

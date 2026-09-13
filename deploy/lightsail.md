@@ -72,6 +72,7 @@ Then install it:
 sudo useradd --system --home /opt/propertypilot --create-home propertypilot
 sudo mkdir -p /opt/propertypilot/logs
 sudo mv ~/pp/renewal-server /opt/propertypilot/ && sudo chmod 755 /opt/propertypilot/renewal-server
+sudo rm -rf /opt/propertypilot/web && sudo mv ~/pp/web /opt/propertypilot/web   # the browser version of the app
 sudo tee /opt/propertypilot/.env >/dev/null <<'ENV'
 DATABASE_URL=postgresql://renewal:CHANGE-ME@<db-endpoint>:5432/renewal?sslmode=require
 BIND_ADDR=127.0.0.1:8787
@@ -122,6 +123,10 @@ HTTPS directly with `TLS_CERT`/`TLS_KEY` if you already have certificate files �
 443 to the server and skip Caddy.)
 
 ## 5. Point the apps at it
+
+`https://<host>/` also opens the app in any browser (the release tarball ships the web build
+in `web/`, served by the server itself), so people without the desktop app can sign in from
+a browser; the Windows and Android apps keep working the same way.
 
 Windows app and Android app → Setup screen → `https://renewals.example.com`. Create the first
 Admin from the desktop app; users are added under Settings.

@@ -27,6 +27,9 @@ pub struct Config {
     pub mail_sender: String,
     /// Serve HTTPS directly when TLS_CERT and TLS_KEY (PEM) are set.
     pub tls: Option<TlsConfig>,
+    /// Directory with the built web UI (`apps/desktop/dist`) to serve at `/`; `WEB_DIR`,
+    /// defaulting to a `web` folder next to the executable when that exists.
+    pub web_dir: Option<std::path::PathBuf>,
 }
 
 fn env(name: &str) -> Option<String> {
@@ -115,6 +118,13 @@ impl Config {
             (None, None) => None,
             _ => anyhow::bail!("set both TLS_CERT and TLS_KEY, or neither"),
         };
+        let web_dir = match env("WEB_DIR") {
+            Some(dir) => Some(std::path::PathBuf::from(dir)),
+            None => std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(|d| d.join("web")))
+                .filter(|d| d.join("index.html").is_file()),
+        };
         Ok(Config {
             database_url,
             bind_addr,
@@ -123,6 +133,7 @@ impl Config {
             mail,
             mail_sender,
             tls,
+            web_dir,
         })
     }
 }
