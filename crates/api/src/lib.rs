@@ -12,11 +12,13 @@ use serde::{Deserialize, Serialize};
 pub mod automation;
 pub mod contracts;
 pub mod email;
+pub mod expenses;
 pub mod master;
 
 pub use automation::*;
 pub use contracts::*;
 pub use email::*;
+pub use expenses::*;
 pub use master::*;
 
 pub const API_PREFIX: &str = "/api";

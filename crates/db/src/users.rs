@@ -16,6 +16,8 @@ pub struct UserRow {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
+    /// Set when an Admin deleted the user; the row stays for history but is hidden and cannot sign in.
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone)]
@@ -27,7 +29,7 @@ pub struct NewUser<'a> {
 }
 
 const COLS: &str =
-    "id, name, email, role, password_hash, active, created_at, updated_at, last_login_at";
+    "id, name, email, role, password_hash, active, created_at, updated_at, last_login_at, deleted_at";
 
 pub async fn count<'e>(ex: impl PgExecutor<'e>) -> DbResult<i64> {
     sqlx::query_scalar("SELECT count(*) FROM users")
@@ -37,7 +39,7 @@ pub async fn count<'e>(ex: impl PgExecutor<'e>) -> DbResult<i64> {
 
 pub async fn find_by_email<'e>(ex: impl PgExecutor<'e>, email: &str) -> DbResult<Option<UserRow>> {
     sqlx::query_as(&format!(
-        "SELECT {COLS} FROM users WHERE lower(email) = lower($1)"
+        "SELECT {COLS} FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL"
     ))
     .bind(email)
     .fetch_optional(ex)
@@ -53,7 +55,7 @@ pub async fn find_by_id<'e>(ex: impl PgExecutor<'e>, id: Uuid) -> DbResult<Optio
 
 pub async fn list<'e>(ex: impl PgExecutor<'e>) -> DbResult<Vec<UserRow>> {
     sqlx::query_as(&format!(
-        "SELECT {COLS} FROM users ORDER BY active DESC, name"
+        "SELECT {COLS} FROM users WHERE deleted_at IS NULL ORDER BY active DESC, name"
     ))
     .fetch_all(ex)
     .await
@@ -95,4 +97,17 @@ pub async fn set_password_hash<'e>(ex: impl PgExecutor<'e>, id: Uuid, hash: &str
         .execute(ex)
         .await
         .map(|_| ())
+}
+
+/// Soft delete: deactivate, free the email address for reuse, hide from lists.
+pub async fn soft_delete<'e>(ex: impl PgExecutor<'e>, id: Uuid) -> DbResult<()> {
+    sqlx::query(
+        "UPDATE users SET active = FALSE, deleted_at = now(), updated_at = now(),
+                email = 'deleted-' || id::text || '@deleted.invalid'
+          WHERE id = $1 AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .execute(ex)
+    .await
+    .map(|_| ())
 }

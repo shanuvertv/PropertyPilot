@@ -46,6 +46,12 @@ pub enum Capability {
     ManageSettings,
     ManageUsers,
     ViewAuditTrail,
+    /// People living in a unit (shared accommodation): view / add, edit, move out.
+    ViewOccupants,
+    ManageOccupants,
+    /// Bills and costs per unit, split between its occupants.
+    ViewExpenses,
+    ManageExpenses,
 }
 
 impl Role {
@@ -57,7 +63,13 @@ impl Role {
             Role::Leasing => !matches!(cap, ManageSettings | ManageUsers | ViewAuditTrail),
             Role::Operations => matches!(
                 cap,
-                ViewUnits | UpdateUnitStatus | ViewTenants | ViewBuildings
+                ViewUnits
+                    | UpdateUnitStatus
+                    | ViewTenants
+                    | ViewBuildings
+                    | ViewOccupants
+                    | ManageOccupants
+                    | ViewExpenses
             ),
             Role::Management => matches!(
                 cap,
@@ -70,6 +82,8 @@ impl Role {
                     | ViewFollowUps
                     | ViewReports
                     | ViewAuditTrail
+                    | ViewOccupants
+                    | ViewExpenses
             ),
         }
     }

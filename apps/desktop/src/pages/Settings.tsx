@@ -19,6 +19,7 @@ import { AuditCard } from "@/pages/settings/AuditCard";
 import { ImportCard } from "@/pages/settings/ImportCard";
 import { MailSettingsCard } from "@/pages/settings/MailSettingsCard";
 import { ResetPasswordDialog } from "@/components/PasswordDialogs";
+import { FormDialog } from "@/components/forms";
 
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -35,6 +36,7 @@ export function SettingsPage() {
 
   const [form, setForm] = useState({ name: "", email: "", role: "LEASING" as Role, password: "" });
   const [resetFor, setResetFor] = useState<{ id: string; name: string } | null>(null);
+  const [deleteFor, setDeleteFor] = useState<{ id: string; name: string; email: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const createUser = useMutation({
@@ -68,7 +70,7 @@ export function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Users</CardTitle>
-              <CardDescription>Deactivating a user signs them out everywhere immediately.</CardDescription>
+              <CardDescription>Deactivating a user signs them out everywhere immediately; an inactive user can then be deleted.</CardDescription>
             </CardHeader>
             <CardContent>
               {users.isError && (
@@ -117,6 +119,16 @@ export function SettingsPage() {
                           >
                             {u.active ? "Deactivate" : "Activate"}
                           </Button>
+                          {!u.active && u.id !== session?.userId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleteFor({ id: u.id, name: u.name, email: u.email })}
+                            >
+                              Delete
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -209,6 +221,25 @@ export function SettingsPage() {
           <AuditCard />
 
           <ResetPasswordDialog open={resetFor !== null} onOpenChange={(o) => !o && setResetFor(null)} user={resetFor} />
+          <FormDialog
+            open={deleteFor !== null}
+            onOpenChange={(o) => !o && setDeleteFor(null)}
+            title={deleteFor ? `Delete ${deleteFor.name}?` : "Delete user"}
+            description={
+              deleteFor
+                ? `${deleteFor.email} will be signed out everywhere and removed from this list; the address can be used for a new account. Their name stays on the history of what they did.`
+                : undefined
+            }
+            submitLabel="Delete user"
+            destructive
+            onSubmit={async () => {
+              if (!deleteFor) return;
+              await api.deleteUser(deleteFor.id);
+              await queryClient.invalidateQueries({ queryKey: ["users"] });
+            }}
+          >
+            <span className="sr-only">Confirm</span>
+          </FormDialog>
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">

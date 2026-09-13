@@ -171,3 +171,33 @@ pub async fn reset_password(
     tx.commit().await?;
     Ok(())
 }
+
+/// Admin deletes a user: sessions revoked, login disabled, email freed, row hidden. The
+/// name stays so the audit trail and "created by" fields still read correctly.
+pub async fn delete(pool: &PgPool, caller: &Session, user_id: Uuid) -> ServiceResult<()> {
+    caller.require(Capability::ManageUsers)?;
+    if user_id == caller.user_id {
+        return Err(ServiceError::validation(
+            "you cannot delete your own account",
+        ));
+    }
+    let mut tx = pool.begin().await?;
+    let before = users::find_by_id(&mut *tx, user_id)
+        .await?
+        .filter(|u| u.deleted_at.is_none())
+        .ok_or(ServiceError::NotFound("user"))?;
+    sessions::revoke_all_for_user(&mut *tx, user_id).await?;
+    users::soft_delete(&mut *tx, user_id).await?;
+    audit_log::log(
+        &mut *tx,
+        caller,
+        "user",
+        user_id,
+        "USER_DELETED",
+        Some(&json!({ "name": before.name, "email": before.email, "role": before.role })),
+        NONE,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}

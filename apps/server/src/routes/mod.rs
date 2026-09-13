@@ -12,6 +12,7 @@ mod contracts;
 mod dashboard;
 mod documents;
 mod email;
+mod expenses;
 mod import;
 pub mod master;
 mod renewals;
@@ -51,6 +52,7 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
         .route("/api/auth/password", put(auth::change_password))
         .route("/api/users/{id}/password", put(auth::reset_password))
         .route("/api/users", get(users::list).post(users::create))
+        .route("/api/users/{id}", delete(users::delete))
         .route("/api/users/{id}/active", put(users::set_active))
         .route("/api/employees", get(dashboard::employees))
         // phase 1
@@ -197,6 +199,36 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
             get(automation::get_rules).put(automation::save_rules),
         )
         .route("/api/system/sweep", post(automation::run_sweep))
+        // occupants & expenses
+        .route(
+            "/api/units/{id}/occupants",
+            get(expenses::list_occupants).post(expenses::create_occupant),
+        )
+        .route(
+            "/api/occupants/{id}",
+            put(expenses::update_occupant).delete(expenses::delete_occupant),
+        )
+        .route(
+            "/api/occupants/{id}/move-out",
+            post(expenses::move_out_occupant),
+        )
+        .route(
+            "/api/expenses",
+            get(expenses::list_expenses).post(expenses::create_expense),
+        )
+        .route("/api/expenses/summary", get(expenses::summary))
+        .route(
+            "/api/expenses/{id}",
+            get(expenses::get_expense)
+                .put(expenses::update_expense)
+                .delete(expenses::delete_expense),
+        )
+        .route("/api/expenses/{id}/split", post(expenses::split_equal))
+        .route("/api/expenses/{id}/shares", put(expenses::set_shares))
+        .route(
+            "/api/expenses/{id}/shares/{occupant_id}/settled",
+            put(expenses::settle_share),
+        )
         // phase 7
         .route("/api/reports/{kind}", get(reports::report))
         .route("/api/audit", get(reports::audit_list))

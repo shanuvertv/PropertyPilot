@@ -46,3 +46,12 @@ pub async fn set_active(
     let row = users::set_active(&state.pool, &caller, id, req.active).await?;
     Ok(Json(user_summary(row)))
 }
+
+pub async fn delete(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiFailure> {
+    users::delete(&state.pool, &caller, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

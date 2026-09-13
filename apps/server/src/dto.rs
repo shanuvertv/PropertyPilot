@@ -551,3 +551,167 @@ pub fn audit_entry(a: AuditListRow) -> AuditEntry {
         created_at: ts(a.created_at),
     }
 }
+
+// ---------------------------------------------------------------- occupants & expenses
+
+fn money(minor: i64) -> f64 {
+    minor as f64 / 100.0
+}
+
+/// Major units from the wire (`1234.56`) to minor units, rounded to the fils.
+pub fn minor(amount: f64, what: &str) -> Result<i64, ApiFailure> {
+    if !amount.is_finite() || amount < 0.0 || amount > 1.0e12 {
+        return Err(ApiFailure(ServiceError::validation(format!(
+            "{what} is not a valid amount"
+        ))));
+    }
+    Ok((amount * 100.0).round() as i64)
+}
+
+pub fn occupant(o: renewal_db::occupants::OccupantRow, today: NaiveDate) -> Occupant {
+    Occupant {
+        id: o.id.to_string(),
+        unit_id: o.unit_id.to_string(),
+        unit_number: o.unit_number,
+        building_id: o.building_id.to_string(),
+        building_name: o.building_name,
+        tenant_id: o.tenant_id.map(|t| t.to_string()),
+        tenant_name: o.tenant_name,
+        full_name: o.full_name,
+        id_number: o.id_number,
+        phone: o.phone,
+        email: o.email,
+        bed_label: o.bed_label,
+        move_in: d(o.move_in),
+        move_out: o.move_out.map(d),
+        current: o.move_out.is_none_or(|m| m >= today),
+        notes: o.notes,
+        created_at: ts(o.created_at),
+        updated_at: ts(o.updated_at),
+    }
+}
+
+pub fn occupant_input(
+    i: &OccupantInput,
+) -> Result<renewal_db::occupants::OccupantInput, ApiFailure> {
+    Ok(renewal_db::occupants::OccupantInput {
+        tenant_id: uuid_opt(&i.tenant_id, "tenant")?,
+        full_name: i.full_name.clone(),
+        id_number: i.id_number.clone(),
+        phone: i.phone.clone(),
+        email: i.email.clone(),
+        bed_label: i.bed_label.clone(),
+        move_in: date(&i.move_in, "move-in date")?,
+        move_out: date_opt(&i.move_out, "move-out date")?,
+        notes: i.notes.clone(),
+    })
+}
+
+pub fn expense(e: renewal_db::expenses::ExpenseRow) -> Expense {
+    Expense {
+        id: e.id.to_string(),
+        unit_id: e.unit_id.to_string(),
+        unit_number: e.unit_number,
+        building_id: e.building_id.to_string(),
+        building_name: e.building_name,
+        category: e.category,
+        description: e.description,
+        amount: money(e.amount_minor),
+        expense_date: d(e.expense_date),
+        period_start: e.period_start.map(d),
+        period_end: e.period_end.map(d),
+        vendor: e.vendor,
+        reference: e.reference,
+        split_method: e.split_method,
+        notes: e.notes,
+        share_count: e.share_count,
+        settled_count: e.settled_count,
+        created_by_name: e.created_by_name,
+        created_at: ts(e.created_at),
+        updated_at: ts(e.updated_at),
+    }
+}
+
+pub fn expense_input(i: &ExpenseInput) -> Result<renewal_db::expenses::ExpenseInput, ApiFailure> {
+    Ok(renewal_db::expenses::ExpenseInput {
+        unit_id: uuid(&i.unit_id, "unit")?,
+        category: i.category.clone(),
+        description: i.description.clone(),
+        amount_minor: minor(i.amount, "amount")?,
+        expense_date: date(&i.expense_date, "expense date")?,
+        period_start: date_opt(&i.period_start, "period start")?,
+        period_end: date_opt(&i.period_end, "period end")?,
+        vendor: i.vendor.clone(),
+        reference: i.reference.clone(),
+        split_method: i.split_method.clone(),
+        notes: i.notes.clone(),
+    })
+}
+
+pub fn expense_detail(
+    dtl: renewal_services::expenses::ExpenseDetail,
+    today: NaiveDate,
+) -> ExpenseDetail {
+    ExpenseDetail {
+        expense: expense(dtl.expense),
+        shares: dtl
+            .shares
+            .into_iter()
+            .map(|s| ExpenseShare {
+                occupant_id: s.occupant_id.to_string(),
+                occupant_name: s.occupant_name,
+                bed_label: s.bed_label,
+                amount: money(s.amount_minor),
+                settled_at: ts_opt(s.settled_at),
+            })
+            .collect(),
+        occupants: dtl
+            .occupants
+            .into_iter()
+            .map(|o| occupant(o, today))
+            .collect(),
+    }
+}
+
+pub fn expense_summary(s: renewal_services::expenses::Summary) -> ExpenseSummary {
+    ExpenseSummary {
+        from: d(s.scope.from),
+        to: d(s.scope.to),
+        total: money(s.total),
+        expense_count: s.expense_count,
+        this_month: money(s.this_month),
+        last_month: money(s.last_month),
+        outstanding: money(s.outstanding),
+        outstanding_shares: s.outstanding_shares,
+        monthly: s
+            .monthly
+            .into_iter()
+            .map(|m| MonthPoint {
+                month: d(m.month),
+                amount: money(m.amount_minor),
+                expense_count: m.expense_count,
+            })
+            .collect(),
+        by_building: s.by_building.into_iter().map(group_point).collect(),
+        by_unit: s.by_unit.into_iter().map(group_point).collect(),
+        by_category: s
+            .by_category
+            .into_iter()
+            .map(|c| CategoryPoint {
+                category: c.category,
+                amount: money(c.amount_minor),
+                expense_count: c.expense_count,
+            })
+            .collect(),
+    }
+}
+
+fn group_point(g: renewal_db::expenses::GroupTotal) -> GroupPoint {
+    GroupPoint {
+        id: g.id.to_string(),
+        label: g.label,
+        sublabel: g.sublabel,
+        amount: money(g.amount_minor),
+        expense_count: g.expense_count,
+    }
+}

@@ -81,7 +81,15 @@ impl ListQuery {
             .and_then(|k| whitelist.iter().find(|(key, _)| *key == k))
             .copied()
             .unwrap_or(whitelist[0]);
-        format!(" ORDER BY {} {} NULLS LAST ", expr, self.dir.sql())
+        // Apply the direction to every column of a multi-column expression
+        // ("b.name, u.unit_number" must become "b.name DESC, u.unit_number DESC").
+        let dir = self.dir.sql();
+        let cols = expr
+            .split(',')
+            .map(|c| format!("{} {} NULLS LAST", c.trim(), dir))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(" ORDER BY {cols} ")
     }
 }
 
@@ -116,6 +124,12 @@ mod tests {
         assert_eq!(
             q2.order_by(&[("name", "b.name"), ("code", "b.code")]),
             " ORDER BY b.code ASC NULLS LAST "
+        );
+        // every column of a compound sort follows the direction
+        let q3 = ListQuery::new(None, None, None, Some("unit".into()), Some("desc"));
+        assert_eq!(
+            q3.order_by(&[("unit", "b.name, u.unit_number")]),
+            " ORDER BY b.name DESC NULLS LAST, u.unit_number DESC NULLS LAST "
         );
         assert!(q2.like().is_none());
     }

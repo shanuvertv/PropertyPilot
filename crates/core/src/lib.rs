@@ -9,15 +9,17 @@
 pub mod error;
 pub mod expiry;
 pub mod roles;
+pub mod split;
 pub mod status;
 pub mod sweep;
 
 pub use error::{PermissionDenied, TransitionError};
 pub use expiry::{remaining_days, Band, Overlay, Thresholds};
 pub use roles::{Capability, Role};
+pub use split::{equal_split, format_minor, shares_cover};
 pub use status::{
-    ContractStatus, EmailStatus, FollowUpStatus, FollowUpType, NoticeStatus, RenewalStatus,
-    ReportBucket, TenantResponse, UnitStatus,
+    ContractStatus, EmailStatus, ExpenseCategory, FollowUpStatus, FollowUpType, NoticeStatus,
+    RenewalStatus, ReportBucket, SplitMethod, TenantResponse, UnitStatus,
 };
 pub use sweep::{
     plan as plan_sweep, Action as SweepAction, ReminderRule, SweepContract, SweepInput,

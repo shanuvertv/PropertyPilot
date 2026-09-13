@@ -476,6 +476,10 @@ export class ApiClient {
     return this.request<MailTestResult>("POST", "/api/settings/mail/test", { to });
   }
 
+  deleteUser(id: string) {
+    return this.request<void>("DELETE", `/api/users/${id}`);
+  }
+
   // ---- passwords
   changePassword(currentPassword: string, newPassword: string) {
     return this.request<void>("PUT", "/api/auth/password", { currentPassword, newPassword });

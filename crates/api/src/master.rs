@@ -212,6 +212,7 @@ pub enum DocumentEntity {
     Tenant,
     Contract,
     Notice,
+    Expense,
 }
 
 impl DocumentEntity {
@@ -221,6 +222,7 @@ impl DocumentEntity {
             DocumentEntity::Tenant => "tenant",
             DocumentEntity::Contract => "contract",
             DocumentEntity::Notice => "notice",
+            DocumentEntity::Expense => "expense",
         }
     }
     pub fn parse(s: &str) -> Option<DocumentEntity> {

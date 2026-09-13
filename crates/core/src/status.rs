@@ -329,3 +329,23 @@ mod tests {
         );
     }
 }
+
+status_enum! {
+    /// What a unit's bill was for. Fixed order — it is also the colour order in charts.
+    ExpenseCategory {
+        Electricity,
+        Water,
+        Gas,
+        Internet,
+        Maintenance,
+        Cleaning,
+        Municipality,
+        Other,
+    }
+}
+
+status_enum! {
+    /// How a unit's expense is divided between its occupants.
+    /// `None` = a unit-level cost, `Equal` = split evenly, `Custom` = amounts entered by hand.
+    SplitMethod { None, Equal, Custom }
+}
