@@ -49,7 +49,53 @@ fn validate(input: &mut UnitInput) -> ServiceResult<()> {
         .status
         .parse::<UnitStatus>()
         .map_err(|_| ServiceError::validation("invalid unit status"))?;
+    check_occupant_count(input.occupant_count)?;
     Ok(())
+}
+
+/// Upper bound for the number of people in one unit (sanity, not policy).
+pub const MAX_OCCUPANTS: i32 = 500;
+
+fn check_occupant_count(n: i32) -> ServiceResult<()> {
+    if (0..=MAX_OCCUPANTS).contains(&n) {
+        Ok(())
+    } else {
+        Err(ServiceError::validation(
+            "the number of tenants must be between 0 and 500",
+        ))
+    }
+}
+
+/// Sets how many people live in the unit — the number its bills are split by.
+/// Operations may do this without the wider unit-editing right.
+pub async fn set_occupant_count(
+    pool: &PgPool,
+    caller: &Session,
+    id: Uuid,
+    n: i32,
+) -> ServiceResult<UnitSummaryRow> {
+    caller.require(Capability::ManageOccupants)?;
+    check_occupant_count(n)?;
+    let mut tx = pool.begin().await?;
+    let before = units::find(&mut *tx, id)
+        .await?
+        .ok_or(ServiceError::NotFound("unit"))?;
+    units::set_occupant_count(&mut *tx, id, n).await?;
+    let after = units::find(&mut *tx, id)
+        .await?
+        .ok_or(ServiceError::NotFound("unit"))?;
+    audit_log::log(
+        &mut *tx,
+        caller,
+        "unit",
+        id,
+        "OCCUPANT_COUNT_CHANGED",
+        Some(&before.occupant_count),
+        Some(&after.occupant_count),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(after)
 }
 
 pub async fn create(

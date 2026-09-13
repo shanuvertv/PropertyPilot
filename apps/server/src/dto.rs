@@ -175,6 +175,7 @@ pub fn unit(u: UnitSummaryRow) -> UnitSummary {
         floor: u.floor,
         unit_type: u.unit_type,
         status: parse_enum(&u.status).unwrap_or(renewal_core::UnitStatus::Vacant),
+        occupant_count: i64::from(u.occupant_count),
         notes: u.notes,
         contract_id: u.contract_id.map(|x| x.to_string()),
         contract_number: u.contract_number,
@@ -425,7 +426,6 @@ pub fn search_hit(h: DbSearchHit) -> Option<SearchHit> {
         "unit" => SearchKind::Unit,
         "tenant" => SearchKind::Tenant,
         "contract" => SearchKind::Contract,
-        "occupant" => SearchKind::Occupant,
         "expense" => SearchKind::Expense,
         _ => return None,
     };
@@ -570,45 +570,6 @@ pub fn minor(amount: f64, what: &str) -> Result<i64, ApiFailure> {
     Ok((amount * 100.0).round() as i64)
 }
 
-pub fn occupant(o: renewal_db::occupants::OccupantRow, today: NaiveDate) -> Occupant {
-    Occupant {
-        id: o.id.to_string(),
-        unit_id: o.unit_id.to_string(),
-        unit_number: o.unit_number,
-        building_id: o.building_id.to_string(),
-        building_name: o.building_name,
-        tenant_id: o.tenant_id.map(|t| t.to_string()),
-        tenant_name: o.tenant_name,
-        full_name: o.full_name,
-        id_number: o.id_number,
-        phone: o.phone,
-        email: o.email,
-        bed_label: o.bed_label,
-        move_in: d(o.move_in),
-        move_out: o.move_out.map(d),
-        current: o.move_out.is_none_or(|m| m >= today),
-        notes: o.notes,
-        created_at: ts(o.created_at),
-        updated_at: ts(o.updated_at),
-    }
-}
-
-pub fn occupant_input(
-    i: &OccupantInput,
-) -> Result<renewal_db::occupants::OccupantInput, ApiFailure> {
-    Ok(renewal_db::occupants::OccupantInput {
-        tenant_id: uuid_opt(&i.tenant_id, "tenant")?,
-        full_name: i.full_name.clone(),
-        id_number: i.id_number.clone(),
-        phone: i.phone.clone(),
-        email: i.email.clone(),
-        bed_label: i.bed_label.clone(),
-        move_in: date(&i.move_in, "move-in date")?,
-        move_out: date_opt(&i.move_out, "move-out date")?,
-        notes: i.notes.clone(),
-    })
-}
-
 pub fn expense(e: renewal_db::expenses::ExpenseRow) -> Expense {
     Expense {
         id: e.id.to_string(),
@@ -626,8 +587,8 @@ pub fn expense(e: renewal_db::expenses::ExpenseRow) -> Expense {
         reference: e.reference,
         split_method: e.split_method,
         notes: e.notes,
-        share_count: e.share_count,
-        settled_count: e.settled_count,
+        split_count: i64::from(e.split_count),
+        settled_count: i64::from(e.settled_count),
         created_by_name: e.created_by_name,
         created_at: ts(e.created_at),
         updated_at: ts(e.updated_at),
@@ -646,31 +607,30 @@ pub fn expense_input(i: &ExpenseInput) -> Result<renewal_db::expenses::ExpenseIn
         vendor: i.vendor.clone(),
         reference: i.reference.clone(),
         split_method: i.split_method.clone(),
+        split_count: count(i.split_count.unwrap_or(0), "number of people")?,
         notes: i.notes.clone(),
     })
 }
 
-pub fn expense_detail(
-    dtl: renewal_services::expenses::ExpenseDetail,
-    today: NaiveDate,
-) -> ExpenseDetail {
+/// A small non-negative count from the wire (people in a unit, shares paid).
+pub fn count(n: i64, what: &str) -> Result<i32, ApiFailure> {
+    i32::try_from(n)
+        .ok()
+        .filter(|n| *n >= 0)
+        .ok_or_else(|| ApiFailure(ServiceError::validation(format!("invalid {what}"))))
+}
+
+pub fn expense_detail(dtl: renewal_services::expenses::ExpenseDetail) -> ExpenseDetail {
     ExpenseDetail {
         expense: expense(dtl.expense),
         shares: dtl
             .shares
             .into_iter()
             .map(|s| ExpenseShare {
-                occupant_id: s.occupant_id.to_string(),
-                occupant_name: s.occupant_name,
-                bed_label: s.bed_label,
+                index: i64::from(s.index),
                 amount: money(s.amount_minor),
-                settled_at: ts_opt(s.settled_at),
+                settled: s.settled,
             })
-            .collect(),
-        occupants: dtl
-            .occupants
-            .into_iter()
-            .map(|o| occupant(o, today))
             .collect(),
     }
 }

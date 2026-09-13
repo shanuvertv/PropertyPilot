@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, DoorOpen, FileText, Receipt, Search, UserRound, Users } from "lucide-react";
+import { Building2, DoorOpen, FileText, Receipt, Search, Users } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import type { SearchHit, SearchKind } from "@/api/types-domain";
@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useApp } from "@/lib/app-state";
 import { cn } from "@/lib/utils";
 
-const ICON: Record<SearchKind, typeof Building2> = { building: Building2, unit: DoorOpen, tenant: Users, contract: FileText, occupant: UserRound, expense: Receipt };
-const LABEL: Record<SearchKind, string> = { building: "Building", unit: "Unit", tenant: "Tenant", contract: "Contract", occupant: "Occupant", expense: "Expense" };
+const ICON: Record<SearchKind, typeof Building2> = { building: Building2, unit: DoorOpen, tenant: Users, contract: FileText, expense: Receipt };
+const LABEL: Record<SearchKind, string> = { building: "Building", unit: "Unit", tenant: "Tenant", contract: "Contract", expense: "Expense" };
 
 function target(hit: SearchHit): string {
   switch (hit.kind) {
@@ -17,8 +17,6 @@ function target(hit: SearchHit): string {
       return `/buildings/${hit.id}`;
     case "unit":
       return `/units/${hit.id}`;
-    case "occupant":
-      return `/units/${hit.id}?tab=occupants`;
     case "expense":
       return `/expenses/${hit.id}`;
     case "tenant":
@@ -28,7 +26,7 @@ function target(hit: SearchHit): string {
   }
 }
 
-/** Ctrl+K global search across buildings, units, tenants, contracts, occupants and expenses. */
+/** Ctrl+K global search across buildings, units, tenants, contracts and expenses. */
 export function CommandPalette() {
   const { api } = useApp();
   const navigate = useNavigate();

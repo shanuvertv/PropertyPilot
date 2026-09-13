@@ -1,24 +1,24 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus } from "lucide-react";
+import { Minus, Pencil, Plus } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
-import type { Expense, Occupant, OccupantInput } from "@/api/types-domain";
+import type { Expense, UnitSummary } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
 import { HorizontalBars, MonthlyTrend, categoryColor } from "@/components/charts";
 import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
-import { errorMessage, FormDialog, selectClass, TextAreaField, TextField } from "@/components/forms";
+import { errorMessage, selectClass } from "@/components/forms";
 import { SearchBox } from "@/components/SearchBox";
 import { useLocalFilter } from "@/lib/local-filter";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
-import { EXPENSE_CATEGORY_LABEL, formatDate, formatMoney, formatMonth, keys, todayIso } from "@/lib/format";
+import { EXPENSE_CATEGORY_LABEL, formatDate, formatMoney, formatMonth, keys } from "@/lib/format";
 import { ExpenseDialog } from "@/pages/expenses/ExpenseDialog";
 import { SplitBadge } from "@/pages/expenses/ExpensesPage";
 import { UnitDialog } from "./UnitDialog";
@@ -28,7 +28,9 @@ export function UnitPage() {
   const { api, can } = useApp();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") ?? "occupants";
+  const canExpenses = can("VIEW_EXPENSES");
+  const requested = params.get("tab");
+  const tab = requested === "history" || (requested === "expenses" && canExpenses) ? requested : canExpenses ? "expenses" : "history";
   const unit = useQuery({ queryKey: ["units", "detail", id], queryFn: () => api.getUnit(id) });
   const [edit, setEdit] = useState(false);
 
@@ -61,7 +63,7 @@ export function UnitPage() {
       />
 
       <Card className="mb-4">
-        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 text-[13.5px] md:grid-cols-4">
+        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 text-[13.5px] md:grid-cols-3 xl:grid-cols-5">
           <div>
             <div className="text-[12px] text-muted-foreground">Tenant</div>
             <div>{u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="text-primary hover:underline">{u.tenantName}</Link> : "Vacant"}</div>
@@ -78,21 +80,21 @@ export function UnitPage() {
             <div className="text-[12px] text-muted-foreground">Renewal</div>
             <div>{u.caseId ? can("VIEW_RENEWALS") ? <Link to={`/renewals/${u.caseId}`} className="hover:underline"><RenewalStatusBadge status={u.renewalStatus} /></Link> : <RenewalStatusBadge status={u.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>}</div>
           </div>
+          <div>
+            <div className="text-[12px] text-muted-foreground">Number of tenants</div>
+            <TenantCount unit={u} />
+          </div>
         </CardContent>
       </Card>
 
       <Tabs value={tab} onValueChange={(v) => setParams({ tab: String(v) })}>
         <TabsList>
-          <TabsTrigger value="occupants">Occupants</TabsTrigger>
-          {can("VIEW_EXPENSES") && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
+          {canExpenses && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
-        <TabsContent value="occupants" className="pt-4">
-          <OccupantsTab unitId={id} />
-        </TabsContent>
-        {can("VIEW_EXPENSES") && (
+        {canExpenses && (
           <TabsContent value="expenses" className="pt-4">
-            <UnitExpensesTab unit={{ id, buildingId: u.buildingId, label: `${u.buildingName} · ${u.unitNumber}` }} />
+            <UnitExpensesTab unit={{ id, buildingId: u.buildingId, label: `${u.buildingName} · ${u.unitNumber}`, occupantCount: u.occupantCount }} />
           </TabsContent>
         )}
         <TabsContent value="history" className="pt-4">
@@ -105,153 +107,75 @@ export function UnitPage() {
   );
 }
 
-// ---------------------------------------------------------------- occupants
+// ---------------------------------------------------------------- number of tenants
 
-const emptyOccupant = (): OccupantInput => ({ tenantId: null, fullName: "", idNumber: null, phone: null, email: null, bedLabel: null, moveIn: todayIso(), moveOut: null, notes: null });
-
-function OccupantsTab({ unitId }: { unitId: string }) {
+/**
+ * How many people live in the unit — the number its bills are split by. Admin,
+ * Leasing and Operations can change it in place (− / + or type a number).
+ */
+function TenantCount({ unit }: { unit: UnitSummary }) {
   const { api, can } = useApp();
   const queryClient = useQueryClient();
-  const [showPast, setShowPast] = useState(false);
-  const [dialog, setDialog] = useState<{ edit: Occupant | null } | null>(null);
-  const [moveOut, setMoveOut] = useState<Occupant | null>(null);
+  const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const manage = can("MANAGE_OCCUPANTS");
-  const list = useQuery({ queryKey: ["occupants", unitId, showPast], queryFn: () => api.occupants(unitId, showPast) });
-  const filter = useLocalFilter(list.data, (o) => [o.fullName, o.bedLabel, o.tenantName, o.phone, o.idNumber, o.email]);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["occupants", unitId] });
-
-  const reactivate = useMutation({
-    mutationFn: (o: Occupant) => api.moveOutOccupant(o.id, null),
-    onSuccess: refresh,
-    onError: (e) => setError(errorMessage(e, "Could not update the occupant.")),
-  });
-
-  const [view, setView] = useViewMode("unit-occupants");
-  const columns: Column<Occupant>[] = [
-    { key: "name", header: "Name", card: "title", render: (o) => <span className="font-medium">{o.fullName}{!o.current && <Badge variant="outline" className="ml-2">Moved out</Badge>}</span> },
-    { key: "bed", header: "Bed", card: "metric", render: (o) => o.bedLabel ?? "—" },
-    { key: "tenant", header: "Company", card: "subtitle", render: (o) => o.tenantName ?? "—" },
-    { key: "phone", header: "Phone", render: (o) => o.phone ?? "—" },
-    { key: "idn", header: "ID number", render: (o) => o.idNumber ?? "—" },
-    { key: "in", header: "Moved in", card: "metric", render: (o) => formatDate(o.moveIn) },
-    { key: "out", header: "Moved out", card: "metric", render: (o) => (o.moveOut ? formatDate(o.moveOut) : "—") },
-    {
-      key: "actions",
-      header: "",
-      className: "text-right",
-      render: (o) =>
-        manage ? (
-          <span className="inline-flex gap-1">
-            <Button size="xs" variant="ghost" onClick={() => setDialog({ edit: o })}>Edit</Button>
-            {o.current ? (
-              <Button size="xs" variant="ghost" onClick={() => setMoveOut(o)}>Move out</Button>
-            ) : (
-              <Button size="xs" variant="ghost" onClick={() => reactivate.mutate(o)}>Reactivate</Button>
-            )}
-          </span>
-        ) : null,
+  const save = useMutation({
+    mutationFn: (n: number) => api.setUnitOccupantCount(unit.id, n),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(["units", "detail", unit.id], updated);
+      setDraft(null);
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ["units"] });
     },
-  ];
+    onError: (e) => setError(errorMessage(e, "Could not save the number of tenants.")),
+  });
+  if (!can("MANAGE_OCCUPANTS")) return <div className="tabular-nums">{unit.occupantCount}</div>;
 
-  const current = (list.data ?? []).filter((o) => o.current).length;
-
+  const commit = () => {
+    if (draft === null) return;
+    const n = Number(draft);
+    if (!Number.isInteger(n) || n < 0 || n > 500) {
+      setError("Enter a whole number between 0 and 500.");
+      return;
+    }
+    if (n === unit.occupantCount) setDraft(null);
+    else save.mutate(n);
+  };
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[13px] text-muted-foreground">
-          {current} living here now. Bills split equally go to the people present on the bill date.
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchBox value={filter.q} onChange={filter.setQ} placeholder="Search name, bed, phone or ID" className="max-w-[260px]" />
-          <label className="flex items-center gap-2 text-[13px]">
-            <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
-            Show past occupants
-          </label>
-          <ViewToggle value={view} onChange={setView} />
-          {manage && (
-            <Button size="sm" onClick={() => setDialog({ edit: null })}>
-              <Plus data-icon="inline-start" />
-              Add occupant
-            </Button>
-          )}
-        </div>
-      </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      <DataTable view={view} columns={columns} rows={filter.filtered} rowKey={(o) => o.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load occupants.") : null} empty={filter.q ? "No occupant matches the search." : "Nobody is recorded in this unit yet."} />
-
-      <OccupantDialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)} unitId={unitId} edit={dialog?.edit ?? null} onSaved={refresh} />
-      <MoveOutDialog occupant={moveOut} onOpenChange={(o) => !o && setMoveOut(null)} onSaved={refresh} />
+    <div className="flex flex-wrap items-center gap-1">
+      <Button variant="outline" size="icon-xs" aria-label="One tenant fewer" disabled={save.isPending || unit.occupantCount === 0} onClick={() => save.mutate(unit.occupantCount - 1)}>
+        <Minus />
+      </Button>
+      <Input
+        type="number"
+        min={0}
+        max={500}
+        inputMode="numeric"
+        aria-label="Number of tenants"
+        className="h-6 w-14 px-1 text-center tabular-nums"
+        value={draft ?? String(unit.occupantCount)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            setDraft(null);
+            setError(null);
+          }
+        }}
+      />
+      <Button variant="outline" size="icon-xs" aria-label="One tenant more" disabled={save.isPending || unit.occupantCount >= 500} onClick={() => save.mutate(unit.occupantCount + 1)}>
+        <Plus />
+      </Button>
+      {error && <span className="basis-full text-[12px] text-destructive">{error}</span>}
     </div>
-  );
-}
-
-function OccupantDialog({ open, onOpenChange, unitId, edit, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; unitId: string; edit: Occupant | null; onSaved: () => Promise<unknown> | unknown }) {
-  const { api } = useApp();
-  const [form, setForm] = useState<OccupantInput>(emptyOccupant());
-  const key = `${open}-${edit?.id ?? "new"}`;
-  const [seeded, setSeeded] = useState("");
-  if (open && seeded !== key) {
-    setSeeded(key);
-    setForm(edit ? { tenantId: edit.tenantId, fullName: edit.fullName, idNumber: edit.idNumber, phone: edit.phone, email: edit.email, bedLabel: edit.bedLabel, moveIn: edit.moveIn, moveOut: edit.moveOut, notes: edit.notes } : emptyOccupant());
-  }
-  const set = (p: Partial<OccupantInput>) => setForm((f) => ({ ...f, ...p }));
-  const s = (v: string) => (v.trim() ? v.trim() : null);
-  return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={edit ? "Edit occupant" : "Add occupant"}
-      description="A person living in this unit. The company defaults to the unit's current tenant."
-      submitLabel={edit ? "Save" : "Add occupant"}
-      onSubmit={async () => {
-        if (edit) await api.updateOccupant(edit.id, form);
-        else await api.createOccupant(unitId, form);
-        await onSaved();
-      }}
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField id="o-name" label="Full name" value={form.fullName} onChange={(v) => set({ fullName: v })} required autoFocus className="sm:col-span-2" />
-        <TextField id="o-bed" label="Bed / room" value={form.bedLabel ?? ""} onChange={(v) => set({ bedLabel: s(v) })} placeholder="e.g. A, 3, upper" />
-        <TextField id="o-id" label="ID / passport number" value={form.idNumber ?? ""} onChange={(v) => set({ idNumber: s(v) })} />
-        <TextField id="o-phone" label="Phone" value={form.phone ?? ""} onChange={(v) => set({ phone: s(v) })} />
-        <TextField id="o-email" label="Email" type="email" value={form.email ?? ""} onChange={(v) => set({ email: s(v) })} />
-        <TextField id="o-in" label="Moved in" type="date" value={form.moveIn} onChange={(v) => set({ moveIn: v })} required />
-        <TextField id="o-out" label="Moved out" type="date" value={form.moveOut ?? ""} onChange={(v) => set({ moveOut: v || null })} hint="Leave empty while they live here." />
-        <TextAreaField id="o-notes" label="Notes" value={form.notes ?? ""} onChange={(v) => set({ notes: s(v) })} className="sm:col-span-2" />
-      </div>
-    </FormDialog>
-  );
-}
-
-function MoveOutDialog({ occupant, onOpenChange, onSaved }: { occupant: Occupant | null; onOpenChange: (o: boolean) => void; onSaved: () => Promise<unknown> | unknown }) {
-  const { api } = useApp();
-  const [date, setDate] = useState(todayIso());
-  return (
-    <FormDialog
-      open={occupant !== null}
-      onOpenChange={onOpenChange}
-      title={occupant ? `Move out ${occupant.fullName}` : "Move out"}
-      description="Bills dated after this day are no longer split with them; their past shares stay."
-      submitLabel="Record move-out"
-      onSubmit={async () => {
-        if (!occupant) return;
-        await api.moveOutOccupant(occupant.id, date);
-        await onSaved();
-      }}
-    >
-      <TextField id="mo-date" label="Move-out date" type="date" value={date} onChange={setDate} required />
-    </FormDialog>
   );
 }
 
 // ---------------------------------------------------------------- expenses
 
-function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; label: string } }) {
+function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; label: string; occupantCount: number } }) {
   const { api, can } = useApp();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -298,7 +222,7 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
             ))}
           </select>
           <span className="text-[12.5px] text-muted-foreground">
-            {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected.` : "All shares settled."}
+            {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected from the tenants.` : "Nothing outstanding from the tenants."}
           </span>
           <ViewToggle value={view} onChange={setView} />
         </div>

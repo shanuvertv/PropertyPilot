@@ -406,7 +406,6 @@ pub enum SearchKind {
     Unit,
     Tenant,
     Contract,
-    Occupant,
     Expense,
 }
 

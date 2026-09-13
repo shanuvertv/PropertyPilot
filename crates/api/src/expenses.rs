@@ -1,57 +1,7 @@
-//! Occupants and expenses per unit (shared accommodation: bills split between occupants).
+//! Expenses per unit, split equally between the people living there.
 //! Amounts on the wire are major units with two decimals (`1234.56`), never minor units.
 
 use serde::{Deserialize, Serialize};
-
-// ---------------------------------------------------------------- occupants
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct Occupant {
-    pub id: String,
-    pub unit_id: String,
-    pub unit_number: String,
-    pub building_id: String,
-    pub building_name: String,
-    pub tenant_id: Option<String>,
-    pub tenant_name: Option<String>,
-    pub full_name: String,
-    pub id_number: Option<String>,
-    pub phone: Option<String>,
-    pub email: Option<String>,
-    pub bed_label: Option<String>,
-    pub move_in: String,
-    pub move_out: Option<String>,
-    /// Living there today (no move-out date, or one in the future).
-    pub current: bool,
-    pub notes: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct OccupantInput {
-    pub tenant_id: Option<String>,
-    pub full_name: String,
-    pub id_number: Option<String>,
-    pub phone: Option<String>,
-    pub email: Option<String>,
-    pub bed_label: Option<String>,
-    pub move_in: String,
-    pub move_out: Option<String>,
-    pub notes: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct MoveOutRequest {
-    /// `null` re-activates an occupant who was moved out by mistake.
-    pub move_out: Option<String>,
-}
 
 // ---------------------------------------------------------------- expenses
 
@@ -74,7 +24,9 @@ pub struct Expense {
     pub reference: Option<String>,
     pub split_method: String,
     pub notes: Option<String>,
-    pub share_count: i64,
+    /// People the bill is split between (0 when not split).
+    pub split_count: i64,
+    /// How many of them have paid.
     pub settled_count: i64,
     pub created_by_name: Option<String>,
     pub created_at: String,
@@ -94,20 +46,23 @@ pub struct ExpenseInput {
     pub period_end: Option<String>,
     pub vendor: Option<String>,
     pub reference: Option<String>,
-    /// `NONE` | `EQUAL` | `CUSTOM`. `EQUAL` splits between the occupants present on the expense date.
+    /// `NONE` | `EQUAL`. `EQUAL` splits evenly between `split_count` people.
     pub split_method: String,
+    /// People to split between; omitted or 0 = the unit's number of tenants.
+    #[serde(default)]
+    pub split_count: Option<i64>,
     pub notes: Option<String>,
 }
 
+/// One person's equal share of a split bill; the first shares carry the rounding remainder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ExpenseShare {
-    pub occupant_id: String,
-    pub occupant_name: String,
-    pub bed_label: Option<String>,
+    /// 1-based position.
+    pub index: i64,
     pub amount: f64,
-    pub settled_at: Option<String>,
+    pub settled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,30 +71,23 @@ pub struct ExpenseShare {
 pub struct ExpenseDetail {
     pub expense: Expense,
     pub shares: Vec<ExpenseShare>,
-    /// Occupants living in the unit on the expense date — the candidates for a split.
-    pub occupants: Vec<Occupant>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct ShareInput {
-    pub occupant_id: String,
-    pub amount: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct SetSharesRequest {
-    pub shares: Vec<ShareInput>,
+pub struct SplitRequest {
+    /// People to split between; omitted = the unit's number of tenants.
+    #[serde(default)]
+    pub split_count: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct SettleRequest {
-    pub settled: bool,
+    /// How many of the people have paid (0 ..= splitCount).
+    pub settled_count: i64,
 }
 
 // ---------------------------------------------------------------- dashboard

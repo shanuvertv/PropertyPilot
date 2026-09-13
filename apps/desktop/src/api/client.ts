@@ -72,8 +72,6 @@ import type {
   MailConfigInput,
   MailConfigView,
   MailTestResult,
-  Occupant,
-  OccupantInput,
   Expense,
   ExpenseInput,
   ExpenseDetail,
@@ -488,24 +486,9 @@ export class ApiClient {
     return this.request<void>("DELETE", `/api/users/${id}`);
   }
 
-  // ---- occupants & expenses
-  searchOccupants(p: ListParams & { buildingId?: string; unitId?: string; tenantId?: string; current?: boolean }) {
-    return this.request<Page<Occupant>>("GET", `/api/occupants${qs(p)}`);
-  }
-  occupants(unitId: string, includePast = false) {
-    return this.request<Occupant[]>("GET", `/api/units/${unitId}/occupants${qs({ includePast })}`);
-  }
-  createOccupant(unitId: string, input: OccupantInput) {
-    return this.request<Occupant>("POST", `/api/units/${unitId}/occupants`, input);
-  }
-  updateOccupant(id: string, input: OccupantInput) {
-    return this.request<Occupant>("PUT", `/api/occupants/${id}`, input);
-  }
-  moveOutOccupant(id: string, moveOut: string | null) {
-    return this.request<Occupant>("POST", `/api/occupants/${id}/move-out`, { moveOut });
-  }
-  deleteOccupant(id: string) {
-    return this.request<void>("DELETE", `/api/occupants/${id}`);
+  // ---- number of tenants per unit & expenses
+  setUnitOccupantCount(unitId: string, occupantCount: number) {
+    return this.request<UnitSummary>("PUT", `/api/units/${unitId}/occupant-count`, { occupantCount });
   }
   expenses(p: ExpenseListParams) {
     return this.request<Page<Expense>>("GET", `/api/expenses${qs(p)}`);
@@ -522,14 +505,13 @@ export class ApiClient {
   deleteExpense(id: string) {
     return this.request<void>("DELETE", `/api/expenses/${id}`);
   }
-  splitExpenseEqually(id: string) {
-    return this.request<ExpenseDetail>("POST", `/api/expenses/${id}/split`);
+  /** Split evenly between `splitCount` people (omit for the unit's number of tenants). */
+  splitExpenseEqually(id: string, splitCount?: number) {
+    return this.request<ExpenseDetail>("POST", `/api/expenses/${id}/split`, { splitCount: splitCount ?? null });
   }
-  setExpenseShares(id: string, shares: { occupantId: string; amount: number }[]) {
-    return this.request<ExpenseDetail>("PUT", `/api/expenses/${id}/shares`, { shares });
-  }
-  settleShare(id: string, occupantId: string, settled: boolean) {
-    return this.request<ExpenseDetail>("PUT", `/api/expenses/${id}/shares/${occupantId}/settled`, { settled });
+  /** Record how many of the people have paid their share. */
+  setExpenseSettled(id: string, settledCount: number) {
+    return this.request<ExpenseDetail>("PUT", `/api/expenses/${id}/settled`, { settledCount });
   }
   expenseSummary(p: ExpenseSummaryParams) {
     return this.request<ExpenseSummary>("GET", `/api/expenses/summary${qs(p)}`);

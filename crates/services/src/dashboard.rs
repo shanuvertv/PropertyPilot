@@ -161,7 +161,6 @@ pub async fn search(pool: &PgPool, caller: &Session, term: &str) -> ServiceResul
             "unit" => caller.role.allows(Capability::ViewUnits),
             "tenant" => caller.role.allows(Capability::ViewTenants),
             "contract" => caller.role.allows(Capability::ViewContracts),
-            "occupant" => caller.role.allows(Capability::ViewOccupants),
             "expense" => caller.role.allows(Capability::ViewExpenses),
             _ => false,
         })

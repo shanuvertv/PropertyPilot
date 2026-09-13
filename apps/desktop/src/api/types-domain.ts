@@ -104,6 +104,8 @@ export interface UnitSummary {
   floor: string | null;
   unitType: string | null;
   status: UnitStatus;
+  /** How many people live in the unit (what its bills are split by). */
+  occupantCount: number;
   notes: string | null;
   contractId: string | null;
   contractNumber: string | null;
@@ -129,6 +131,7 @@ export interface UnitInput {
   floor: string | null;
   unitType: string | null;
   status: UnitStatus;
+  occupantCount: number;
   notes: string | null;
 }
 
@@ -437,7 +440,7 @@ export interface Dashboard {
   completedWindowDays: number;
 }
 
-export type SearchKind = "building" | "unit" | "tenant" | "contract" | "occupant" | "expense";
+export type SearchKind = "building" | "unit" | "tenant" | "contract" | "expense";
 
 export interface SearchHit {
   kind: SearchKind;
@@ -771,43 +774,10 @@ export interface ImportResult {
   warnings: string[];
 }
 
-// ---------------------------------------------------------------- occupants & expenses
+// ---------------------------------------------------------------- expenses
 
 export type ExpenseCategory = "ELECTRICITY" | "WATER" | "GAS" | "INTERNET" | "MAINTENANCE" | "CLEANING" | "MUNICIPALITY" | "OTHER";
-export type SplitMethod = "NONE" | "EQUAL" | "CUSTOM";
-
-export interface Occupant {
-  id: string;
-  unitId: string;
-  unitNumber: string;
-  buildingId: string;
-  buildingName: string;
-  tenantId: string | null;
-  tenantName: string | null;
-  fullName: string;
-  idNumber: string | null;
-  phone: string | null;
-  email: string | null;
-  bedLabel: string | null;
-  moveIn: string;
-  moveOut: string | null;
-  current: boolean;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface OccupantInput {
-  tenantId: string | null;
-  fullName: string;
-  idNumber: string | null;
-  phone: string | null;
-  email: string | null;
-  bedLabel: string | null;
-  moveIn: string;
-  moveOut: string | null;
-  notes: string | null;
-}
+export type SplitMethod = "NONE" | "EQUAL";
 
 export interface Expense {
   id: string;
@@ -825,7 +795,9 @@ export interface Expense {
   reference: string | null;
   splitMethod: SplitMethod;
   notes: string | null;
-  shareCount: number;
+  /** People the bill is split between (0 when not split). */
+  splitCount: number;
+  /** How many of them have paid. */
   settledCount: number;
   createdByName: string | null;
   createdAt: string;
@@ -843,21 +815,21 @@ export interface ExpenseInput {
   vendor: string | null;
   reference: string | null;
   splitMethod: SplitMethod;
+  /** People to split between; 0 / omitted = the unit's number of tenants. */
+  splitCount?: number | null;
   notes: string | null;
 }
 
+/** One person's equal share; the first shares carry the rounding remainder. */
 export interface ExpenseShare {
-  occupantId: string;
-  occupantName: string;
-  bedLabel: string | null;
+  index: number;
   amount: number;
-  settledAt: string | null;
+  settled: boolean;
 }
 
 export interface ExpenseDetail {
   expense: Expense;
   shares: ExpenseShare[];
-  occupants: Occupant[];
 }
 
 export interface ExpenseListParams extends ListParams {

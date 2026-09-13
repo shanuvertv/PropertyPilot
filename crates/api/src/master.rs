@@ -113,6 +113,8 @@ pub struct UnitSummary {
     pub floor: Option<String>,
     pub unit_type: Option<String>,
     pub status: UnitStatus,
+    /// How many people live in the unit (what its bills are split by).
+    pub occupant_count: i64,
     pub notes: Option<String>,
     pub contract_id: Option<String>,
     pub contract_number: Option<String>,
@@ -141,7 +143,16 @@ pub struct UnitInput {
     pub floor: Option<String>,
     pub unit_type: Option<String>,
     pub status: UnitStatus,
+    #[serde(default)]
+    pub occupant_count: i64,
     pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct SetOccupantCountRequest {
+    pub occupant_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

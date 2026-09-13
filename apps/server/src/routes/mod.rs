@@ -199,19 +199,10 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
             get(automation::get_rules).put(automation::save_rules),
         )
         .route("/api/system/sweep", post(automation::run_sweep))
-        // occupants & expenses
+        // number of tenants per unit & expenses
         .route(
-            "/api/units/{id}/occupants",
-            get(expenses::list_occupants).post(expenses::create_occupant),
-        )
-        .route("/api/occupants", get(expenses::search_occupants))
-        .route(
-            "/api/occupants/{id}",
-            put(expenses::update_occupant).delete(expenses::delete_occupant),
-        )
-        .route(
-            "/api/occupants/{id}/move-out",
-            post(expenses::move_out_occupant),
+            "/api/units/{id}/occupant-count",
+            put(master::set_unit_occupant_count),
         )
         .route(
             "/api/expenses",
@@ -225,11 +216,7 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
                 .delete(expenses::delete_expense),
         )
         .route("/api/expenses/{id}/split", post(expenses::split_equal))
-        .route("/api/expenses/{id}/shares", put(expenses::set_shares))
-        .route(
-            "/api/expenses/{id}/shares/{occupant_id}/settled",
-            put(expenses::settle_share),
-        )
+        .route("/api/expenses/{id}/settled", put(expenses::settle))
         // phase 7
         .route("/api/reports/{kind}", get(reports::report))
         .route("/api/audit", get(reports::audit_list))

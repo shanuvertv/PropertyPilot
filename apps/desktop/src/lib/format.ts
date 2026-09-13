@@ -135,9 +135,8 @@ export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
 };
 
 export const SPLIT_METHOD_LABEL: Record<SplitMethod, string> = {
-  NONE: "Not split (unit cost)",
-  EQUAL: "Split equally between occupants",
-  CUSTOM: "Custom amounts per occupant",
+  NONE: "Unit cost (not split)",
+  EQUAL: "Split equally between the tenants",
 };
 
 export const CURRENCY = "AED";

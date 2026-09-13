@@ -46,10 +46,9 @@ pub enum Capability {
     ManageSettings,
     ManageUsers,
     ViewAuditTrail,
-    /// People living in a unit (shared accommodation): view / add, edit, move out.
-    ViewOccupants,
+    /// Set how many people live in a unit (the number the bills are split by).
     ManageOccupants,
-    /// Bills and costs per unit, split between its occupants.
+    /// Bills and costs per unit, split equally between the people living there.
     ViewExpenses,
     ManageExpenses,
 }
@@ -67,7 +66,6 @@ impl Role {
                     | UpdateUnitStatus
                     | ViewTenants
                     | ViewBuildings
-                    | ViewOccupants
                     | ManageOccupants
                     | ViewExpenses
             ),
@@ -82,7 +80,6 @@ impl Role {
                     | ViewFollowUps
                     | ViewReports
                     | ViewAuditTrail
-                    | ViewOccupants
                     | ViewExpenses
             ),
         }

@@ -1,4 +1,4 @@
-//! Splitting a bill between the occupants of a unit (minor currency units, e.g. fils).
+//! Splitting a bill between the people living in a unit (minor currency units, e.g. fils).
 //!
 //! Money is handled as integers so the shares always add up to the bill exactly;
 //! any remainder from the division goes to the first shares, one minor unit each.
@@ -16,9 +16,10 @@ pub fn equal_split(total: i64, n: usize) -> Vec<i64> {
         .collect()
 }
 
-/// True when custom shares cover the bill exactly.
-pub fn shares_cover(total: i64, shares: &[i64]) -> bool {
-    shares.iter().all(|s| *s >= 0) && shares.iter().sum::<i64>() == total
+/// What the first `settled` of `n` equal shares add up to — the part of the bill
+/// already collected when `settled` people have paid.
+pub fn settled_amount(total: i64, n: usize, settled: usize) -> i64 {
+    equal_split(total, n).iter().take(settled).sum()
 }
 
 /// Minor units -> "1,234.56" style string (major units with two decimals).
@@ -52,10 +53,12 @@ mod tests {
     }
 
     #[test]
-    fn custom_shares_must_cover_the_bill() {
-        assert!(shares_cover(1_000, &[400, 600]));
-        assert!(!shares_cover(1_000, &[400, 500]));
-        assert!(!shares_cover(1_000, &[1_200, -200]));
+    fn settled_amount_counts_the_first_shares() {
+        assert_eq!(settled_amount(10_000, 3, 0), 0);
+        assert_eq!(settled_amount(10_000, 3, 1), 3_334);
+        assert_eq!(settled_amount(10_000, 3, 3), 10_000);
+        assert_eq!(settled_amount(10_000, 3, 9), 10_000);
+        assert_eq!(settled_amount(10_000, 0, 1), 0);
     }
 
     #[test]

@@ -618,6 +618,7 @@ pub async fn commit(pool: &PgPool, caller: &Session, bytes: &[u8]) -> ServiceRes
                         floor: None,
                         unit_type: r.capacity.map(|c| format!("{c} beds")),
                         status: UnitStatus::Vacant.to_string(),
+                        occupant_count: 0,
                         notes: None,
                     },
                     caller.user_id,

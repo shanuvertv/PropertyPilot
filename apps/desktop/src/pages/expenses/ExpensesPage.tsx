@@ -44,9 +44,9 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 export function SplitBadge({ e }: { e: Expense }) {
-  if (e.splitMethod === "NONE" || e.shareCount === 0) return <Badge variant="outline">Unit cost</Badge>;
-  const done = e.settledCount === e.shareCount;
-  return <Badge variant={done ? "secondary" : "outline"}>{done ? `Settled ${e.shareCount}/${e.shareCount}` : `${e.settledCount}/${e.shareCount} settled`}</Badge>;
+  if (e.splitMethod === "NONE" || e.splitCount === 0) return <Badge variant="outline">Unit cost</Badge>;
+  const done = e.settledCount === e.splitCount;
+  return <Badge variant={done ? "secondary" : "outline"}>{done ? `All ${e.splitCount} paid` : `${e.settledCount}/${e.splitCount} paid`}</Badge>;
 }
 
 export function ExpensesPage() {
@@ -155,7 +155,7 @@ export function ExpensesPage() {
         <Stat label={period === "12m" ? "Last 12 months" : period === "ytd" ? "This year" : period === "3m" ? "Last 3 months" : period === "custom" ? "Selected dates" : "All time"} value={formatMoney(s?.total)} hint={s ? `${s.expenseCount} expenses` : undefined} />
         <Stat label="This month" value={formatMoney(s?.thisMonth)} hint={delta === null ? undefined : `${delta >= 0 ? "+" : ""}${delta.toFixed(0)}% vs last month`} />
         <Stat label="Last month" value={formatMoney(s?.lastMonth)} />
-        <Stat label="Outstanding from occupants" value={formatMoney(s?.outstanding)} hint={s ? `${s.outstandingShares} unpaid shares` : undefined} />
+        <Stat label="Outstanding from tenants" value={formatMoney(s?.outstanding)} hint={s ? `${s.outstandingShares} unpaid shares` : undefined} />
       </div>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
@@ -201,7 +201,7 @@ export function ExpensesPage() {
         </select>
         <label className="flex items-center gap-2 text-[13px]">
           <input type="checkbox" checked={state.filters.outstanding === "1"} onChange={(e) => update({ page: 1, filters: { outstanding: e.target.checked ? "1" : undefined } })} />
-          Unpaid shares only
+          Not fully paid only
         </label>
         <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>

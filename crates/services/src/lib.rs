@@ -17,7 +17,6 @@ pub mod import;
 pub mod mail_settings;
 pub mod notices;
 pub mod notifications;
-pub mod occupants;
 pub mod pdf;
 pub mod providers;
 pub mod renewals;

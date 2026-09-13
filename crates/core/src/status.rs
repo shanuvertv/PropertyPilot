@@ -345,7 +345,7 @@ status_enum! {
 }
 
 status_enum! {
-    /// How a unit's expense is divided between its occupants.
-    /// `None` = a unit-level cost, `Equal` = split evenly, `Custom` = amounts entered by hand.
-    SplitMethod { None, Equal, Custom }
+    /// How a unit's expense is divided between the people living there.
+    /// `None` = a unit-level cost, `Equal` = split evenly between `split_count` people.
+    SplitMethod { None, Equal }
 }

@@ -19,6 +19,8 @@ type Form = {
   vendor: string;
   reference: string;
   splitMethod: SplitMethod;
+  /** People to split between; "" = the unit's number of tenants. */
+  splitCount: string;
   notes: string;
 };
 
@@ -35,6 +37,7 @@ function blank(unit?: { id: string; buildingId: string }): Form {
     vendor: "",
     reference: "",
     splitMethod: "EQUAL",
+    splitCount: "",
     notes: "",
   };
 }
@@ -52,6 +55,7 @@ function fromExpense(e: Expense): Form {
     vendor: e.vendor ?? "",
     reference: e.reference ?? "",
     splitMethod: e.splitMethod,
+    splitCount: e.splitCount > 0 ? String(e.splitCount) : "",
     notes: e.notes ?? "",
   };
 }
@@ -69,7 +73,7 @@ export function ExpenseDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   edit?: Expense | null;
-  unit?: { id: string; buildingId: string; label: string } | null;
+  unit?: { id: string; buildingId: string; label: string; occupantCount?: number } | null;
   onSaved: (e: Expense) => Promise<void> | void;
 }) {
   const { api } = useApp();
@@ -86,10 +90,19 @@ export function ExpenseDialog({
     enabled: open && !!form.buildingId && !unit,
   });
 
+  // The unit's own head count, for the "split between N" default and hint.
+  const chosen = unit ? { occupantCount: unit.occupantCount } : units.data?.items.find((u) => u.id === form.unitId);
+  const unitCount = chosen?.occupantCount;
+
   async function submit() {
     const amount = Number(form.amount);
     if (!form.unitId) throw new Error("Choose the unit this expense belongs to.");
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter an amount greater than zero.");
+    const splitCount = form.splitCount.trim() ? Number(form.splitCount) : 0;
+    if (!Number.isInteger(splitCount) || splitCount < 0 || splitCount > 500) throw new Error("The number of people must be a whole number between 1 and 500.");
+    if (form.splitMethod === "EQUAL" && splitCount === 0 && !unitCount) {
+      throw new Error("Set the number of tenants in the unit first, or enter how many people share this bill.");
+    }
     const input: ExpenseInput = {
       unitId: form.unitId,
       category: form.category,
@@ -101,6 +114,7 @@ export function ExpenseDialog({
       vendor: opt(form.vendor),
       reference: opt(form.reference),
       splitMethod: form.splitMethod,
+      splitCount: form.splitMethod === "EQUAL" ? splitCount : 0,
       notes: opt(form.notes),
     };
     const saved = edit ? await api.updateExpense(edit.id, input) : await api.createExpense(input);
@@ -114,8 +128,8 @@ export function ExpenseDialog({
       title={edit ? "Edit expense" : "Add expense"}
       description={
         unit
-          ? `For unit ${unit.label}. Choose how the bill is divided between the people living there.`
-          : "A bill or cost that belongs to one unit. Choose how it is divided between the people living there."
+          ? `For unit ${unit.label}. A bill can be split equally between the tenants living there.`
+          : "A bill or cost that belongs to one unit. It can be split equally between the tenants living there."
       }
       submitLabel={edit ? "Save changes" : "Add expense"}
       onSubmit={submit}
@@ -154,15 +168,31 @@ export function ExpenseDialog({
         />
         <TextField id="x-amount" label="Amount (AED)" type="number" value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} placeholder="0.00" required />
         <TextField id="x-desc" label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="e.g. DEWA bill September" required className="sm:col-span-2" />
-        <TextField id="x-date" label="Expense date" type="date" value={form.expenseDate} onChange={(v) => setForm({ ...form, expenseDate: v })} required hint="Bills split equally go to the people living in the unit on this date." />
+        <TextField id="x-date" label="Expense date" type="date" value={form.expenseDate} onChange={(v) => setForm({ ...form, expenseDate: v })} required />
         <SelectField<SplitMethod>
           id="x-split"
-          label="Split between occupants"
+          label="Split the bill"
           value={form.splitMethod}
           onChange={(v) => setForm({ ...form, splitMethod: (v || "NONE") as SplitMethod })}
           options={keys(SPLIT_METHOD_LABEL).map((m) => ({ value: m, label: SPLIT_METHOD_LABEL[m] }))}
-          hint={form.splitMethod === "CUSTOM" ? "Enter each person's amount on the expense page after saving." : undefined}
         />
+        {form.splitMethod === "EQUAL" && (
+          <TextField
+            id="x-split-count"
+            label="Between how many people"
+            type="number"
+            value={form.splitCount}
+            onChange={(v) => setForm({ ...form, splitCount: v })}
+            placeholder={unitCount !== undefined ? String(unitCount) : ""}
+            hint={
+              unitCount === undefined
+                ? "Leave empty to use the unit's number of tenants."
+                : unitCount > 0
+                  ? `Leave empty to use the unit's number of tenants (${unitCount}).`
+                  : "This unit has no tenants recorded yet — enter the number here or set it on the unit."
+            }
+          />
+        )}
         <TextField id="x-pstart" label="Billing period from" type="date" value={form.periodStart} onChange={(v) => setForm({ ...form, periodStart: v })} />
         <TextField id="x-pend" label="Billing period to" type="date" value={form.periodEnd} onChange={(v) => setForm({ ...form, periodEnd: v })} />
         <TextField id="x-vendor" label="Vendor" value={form.vendor} onChange={(v) => setForm({ ...form, vendor: v })} placeholder="DEWA, Etisalat, contractor…" />

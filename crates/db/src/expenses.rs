@@ -1,5 +1,8 @@
-//! Expenses per unit, their split between occupants, and the aggregates behind the
-//! expenses dashboard. Amounts are minor units (fils) as `i64`.
+//! Expenses per unit, split equally between the people living there, and the
+//! aggregates behind the expenses dashboard. Amounts are minor units (fils) as `i64`.
+//!
+//! A split is `split_count` equal shares (remainder on the first ones, see
+//! `renewal_core::equal_split`) and `settled_count` says how many have been paid.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{FromRow, PgExecutor, PgPool, Postgres, QueryBuilder, Row};
@@ -25,21 +28,13 @@ pub struct ExpenseRow {
     pub reference: Option<String>,
     pub split_method: String,
     pub notes: Option<String>,
-    pub share_count: i64,
-    pub settled_count: i64,
+    /// People the bill is split between (0 when not split).
+    pub split_count: i32,
+    /// How many of them have paid.
+    pub settled_count: i32,
     pub created_by_name: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, FromRow, serde::Serialize)]
-pub struct ShareRow {
-    pub expense_id: Uuid,
-    pub occupant_id: Uuid,
-    pub occupant_name: String,
-    pub bed_label: Option<String>,
-    pub amount_minor: i64,
-    pub settled_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -54,6 +49,7 @@ pub struct ExpenseInput {
     pub vendor: Option<String>,
     pub reference: Option<String>,
     pub split_method: String,
+    pub split_count: i32,
     pub notes: Option<String>,
 }
 
@@ -64,15 +60,13 @@ pub struct ExpenseFilter {
     pub category: Option<String>,
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
-    /// Only expenses with at least one unsettled share.
+    /// Only split expenses that somebody still has to pay.
     pub outstanding: Option<bool>,
 }
 
 const SELECT: &str = "SELECT x.id, x.unit_id, u.unit_number, u.building_id, b.name AS building_name, x.category,
        x.description, x.amount_minor, x.expense_date, x.period_start, x.period_end, x.vendor, x.reference,
-       x.split_method, x.notes,
-       (SELECT count(*) FROM expense_shares s WHERE s.expense_id = x.id) AS share_count,
-       (SELECT count(*) FROM expense_shares s WHERE s.expense_id = x.id AND s.settled_at IS NOT NULL) AS settled_count,
+       x.split_method, x.notes, x.split_count, x.settled_count,
        cu.name AS created_by_name, x.created_at, x.updated_at
   FROM expenses x
   JOIN units u ON u.id = x.unit_id
@@ -106,7 +100,7 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, f: &ExpenseFilter, like: &Optio
         qb.push(" AND x.expense_date <= ").push_bind(d);
     }
     if f.outstanding == Some(true) {
-        qb.push(" AND EXISTS (SELECT 1 FROM expense_shares s WHERE s.expense_id = x.id AND s.settled_at IS NULL)");
+        qb.push(" AND x.split_method = 'EQUAL' AND x.settled_count < x.split_count");
     }
     if let Some(p) = like {
         qb.push(" AND (x.description ILIKE ")
@@ -163,8 +157,8 @@ pub async fn insert<'e>(
 ) -> DbResult<Uuid> {
     sqlx::query_scalar(
         "INSERT INTO expenses (unit_id, category, description, amount_minor, expense_date, period_start, period_end,
-                               vendor, reference, split_method, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+                               vendor, reference, split_method, split_count, notes, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id",
     )
     .bind(i.unit_id)
     .bind(&i.category)
@@ -176,6 +170,7 @@ pub async fn insert<'e>(
     .bind(&i.vendor)
     .bind(&i.reference)
     .bind(&i.split_method)
+    .bind(i.split_count)
     .bind(&i.notes)
     .bind(created_by)
     .fetch_one(ex)
@@ -185,8 +180,8 @@ pub async fn insert<'e>(
 pub async fn update<'e>(ex: impl PgExecutor<'e>, id: Uuid, i: &ExpenseInput) -> DbResult<()> {
     sqlx::query(
         "UPDATE expenses SET unit_id = $2, category = $3, description = $4, amount_minor = $5, expense_date = $6,
-                period_start = $7, period_end = $8, vendor = $9, reference = $10, split_method = $11, notes = $12,
-                updated_at = now()
+                period_start = $7, period_end = $8, vendor = $9, reference = $10, split_method = $11, split_count = $12,
+                settled_count = LEAST(settled_count, $12), notes = $13, updated_at = now()
           WHERE id = $1",
     )
     .bind(id)
@@ -200,6 +195,7 @@ pub async fn update<'e>(ex: impl PgExecutor<'e>, id: Uuid, i: &ExpenseInput) -> 
     .bind(&i.vendor)
     .bind(&i.reference)
     .bind(&i.split_method)
+    .bind(i.split_count)
     .bind(&i.notes)
     .execute(ex)
     .await
@@ -214,59 +210,16 @@ pub async fn delete<'e>(ex: impl PgExecutor<'e>, id: Uuid) -> DbResult<()> {
         .map(|_| ())
 }
 
-// ---------------------------------------------------------------- shares
+// ---------------------------------------------------------------- settlement
 
-pub async fn shares<'e>(ex: impl PgExecutor<'e>, expense_id: Uuid) -> DbResult<Vec<ShareRow>> {
-    sqlx::query_as(
-        "SELECT s.expense_id, s.occupant_id, o.full_name AS occupant_name, o.bed_label, s.amount_minor, s.settled_at
-           FROM expense_shares s JOIN occupants o ON o.id = s.occupant_id
-          WHERE s.expense_id = $1
-          ORDER BY o.bed_label NULLS LAST, o.full_name",
-    )
-    .bind(expense_id)
-    .fetch_all(ex)
-    .await
-}
-
-/// Replaces all shares of an expense (settled flags are reset — the amounts changed).
-pub async fn replace_shares(
-    tx: &mut sqlx::PgConnection,
-    expense_id: Uuid,
-    shares: &[(Uuid, i64)],
-) -> DbResult<()> {
-    sqlx::query("DELETE FROM expense_shares WHERE expense_id = $1")
-        .bind(expense_id)
-        .execute(&mut *tx)
-        .await?;
-    for (occupant_id, amount) in shares {
-        sqlx::query(
-            "INSERT INTO expense_shares (expense_id, occupant_id, amount_minor) VALUES ($1, $2, $3)",
-        )
-        .bind(expense_id)
-        .bind(occupant_id)
-        .bind(amount)
-        .execute(&mut *tx)
-        .await?;
-    }
-    Ok(())
-}
-
-pub async fn set_share_settled<'e>(
-    ex: impl PgExecutor<'e>,
-    expense_id: Uuid,
-    occupant_id: Uuid,
-    settled: bool,
-) -> DbResult<bool> {
-    let res = sqlx::query(
-        "UPDATE expense_shares SET settled_at = CASE WHEN $3 THEN now() ELSE NULL END
-          WHERE expense_id = $1 AND occupant_id = $2",
-    )
-    .bind(expense_id)
-    .bind(occupant_id)
-    .bind(settled)
-    .execute(ex)
-    .await?;
-    Ok(res.rows_affected() > 0)
+/// Records how many of the `split_count` people have paid (clamped by the caller).
+pub async fn set_settled_count<'e>(ex: impl PgExecutor<'e>, id: Uuid, n: i32) -> DbResult<()> {
+    sqlx::query("UPDATE expenses SET settled_count = $2, updated_at = now() WHERE id = $1")
+        .bind(id)
+        .bind(n)
+        .execute(ex)
+        .await
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------- aggregates
@@ -384,12 +337,17 @@ pub async fn by_category<'e>(
     .await
 }
 
-/// Sum of shares not yet settled within the scope.
+/// Money still to be collected within the scope, and how many unpaid shares that is.
+/// The settled part of a bill is the first `settled_count` equal shares, which is
+/// `settled * floor(amount / n)` plus one extra minor unit for each remainder share paid.
 pub async fn outstanding<'e>(ex: impl PgExecutor<'e>, s: &SummaryScope) -> DbResult<(i64, i64)> {
     let row: (i64, i64) = sqlx::query_as(&format!(
-        "SELECT coalesce(sum(sh.amount_minor), 0)::bigint, count(*)
-           FROM expense_shares sh JOIN expenses x ON x.id = sh.expense_id JOIN units u ON u.id = x.unit_id
-          {} AND sh.settled_at IS NULL",
+        "SELECT coalesce(sum(x.amount_minor
+                             - (x.settled_count * (x.amount_minor / x.split_count)
+                                + LEAST(x.settled_count, x.amount_minor % x.split_count))), 0)::bigint,
+                coalesce(sum(x.split_count - x.settled_count), 0)::bigint
+           FROM expenses x JOIN units u ON u.id = x.unit_id
+          {} AND x.split_method = 'EQUAL' AND x.split_count > 0 AND x.settled_count < x.split_count",
         scope_sql("WHERE")
     ))
     .bind(s.from)

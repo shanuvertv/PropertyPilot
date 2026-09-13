@@ -19,7 +19,6 @@ pub mod documents;
 pub mod emails;
 pub mod expenses;
 pub mod follow_ups;
-pub mod occupants;
 pub mod paging;
 pub mod renewals;
 pub mod sessions;

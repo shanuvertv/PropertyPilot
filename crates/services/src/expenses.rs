@@ -1,12 +1,12 @@
-//! Expenses per unit and their split between occupants; aggregates for the dashboard.
+//! Expenses per unit, split equally between the people living there; aggregates for
+//! the dashboard.
 
 use chrono::{Datelike, NaiveDate};
-use renewal_core::{equal_split, shares_cover, Capability, ExpenseCategory, SplitMethod};
+use renewal_core::{equal_split, Capability, ExpenseCategory, SplitMethod};
 use renewal_db::expenses::{
-    self, CategoryTotal, ExpenseFilter, ExpenseInput, ExpenseRow, GroupTotal, MonthTotal, ShareRow,
+    self, CategoryTotal, ExpenseFilter, ExpenseInput, ExpenseRow, GroupTotal, MonthTotal,
     SummaryScope,
 };
-use renewal_db::occupants::{self, OccupantRow};
 use renewal_db::paging::{ListQuery, PageResult};
 use renewal_db::{units, PgPool};
 use uuid::Uuid;
@@ -16,10 +16,22 @@ use crate::buildings::trim_opt;
 use crate::error::{ServiceError, ServiceResult};
 use crate::session::Session;
 
+/// Upper bound on how many people a bill can be split between (sanity, not policy).
+pub const MAX_SPLIT: i32 = 500;
+
+/// One person's equal share of a split bill.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Share {
+    /// 1-based position; the first shares carry the rounding remainder.
+    pub index: i32,
+    pub amount_minor: i64,
+    /// Paid: the first `settled_count` shares count as paid.
+    pub settled: bool,
+}
+
 pub struct ExpenseDetail {
     pub expense: ExpenseRow,
-    pub shares: Vec<ShareRow>,
-    pub occupants: Vec<OccupantRow>,
+    pub shares: Vec<Share>,
 }
 
 pub struct Summary {
@@ -34,6 +46,22 @@ pub struct Summary {
     pub by_building: Vec<GroupTotal>,
     pub by_unit: Vec<GroupTotal>,
     pub by_category: Vec<CategoryTotal>,
+}
+
+/// The equal shares of an expense, marked paid in order.
+pub fn shares_of(e: &ExpenseRow) -> Vec<Share> {
+    if e.split_method != SplitMethod::Equal.to_string() || e.split_count <= 0 {
+        return Vec::new();
+    }
+    equal_split(e.amount_minor, e.split_count as usize)
+        .into_iter()
+        .enumerate()
+        .map(|(i, amount_minor)| Share {
+            index: i as i32 + 1,
+            amount_minor,
+            settled: (i as i32) < e.settled_count,
+        })
+        .collect()
 }
 
 pub async fn list(
@@ -51,13 +79,8 @@ pub async fn get(pool: &PgPool, caller: &Session, id: Uuid) -> ServiceResult<Exp
     let expense = expenses::find(pool, id)
         .await?
         .ok_or(ServiceError::NotFound("expense"))?;
-    let shares = expenses::shares(pool, id).await?;
-    let occupants = occupants::present_on(pool, expense.unit_id, expense.expense_date).await?;
-    Ok(ExpenseDetail {
-        expense,
-        shares,
-        occupants,
-    })
+    let shares = shares_of(&expense);
+    Ok(ExpenseDetail { expense, shares })
 }
 
 fn validate(input: &mut ExpenseInput) -> ServiceResult<()> {
@@ -81,6 +104,11 @@ fn validate(input: &mut ExpenseInput) -> ServiceResult<()> {
         .split_method
         .parse::<SplitMethod>()
         .map_err(|_| ServiceError::validation("invalid split method"))?;
+    if !(0..=MAX_SPLIT).contains(&input.split_count) {
+        return Err(ServiceError::validation(
+            "the number of people to split between is out of range",
+        ));
+    }
     if let (Some(a), Some(b)) = (input.period_start, input.period_end) {
         if b < a {
             return Err(ServiceError::validation(
@@ -91,21 +119,27 @@ fn validate(input: &mut ExpenseInput) -> ServiceResult<()> {
     Ok(())
 }
 
-/// Equal shares between the occupants present on the expense date; error when there is nobody.
-async fn equal_shares(
-    tx: &mut renewal_db::PgConnection,
-    unit_id: Uuid,
-    on: NaiveDate,
-    amount_minor: i64,
-) -> ServiceResult<Vec<(Uuid, i64)>> {
-    let people = occupants::present_on(&mut *tx, unit_id, on).await?;
-    if people.is_empty() {
-        return Err(ServiceError::validation(
-            "no occupants are recorded for this unit on the expense date — add them first, or choose another split",
-        ));
+/// Resolves the split: `EQUAL` needs a head count — the one given, else the unit's.
+async fn resolve_split(
+    ex: impl renewal_db::sqlx::PgExecutor<'_>,
+    input: &mut ExpenseInput,
+) -> ServiceResult<()> {
+    let unit = units::find(ex, input.unit_id)
+        .await?
+        .ok_or(ServiceError::NotFound("unit"))?;
+    if input.split_method == SplitMethod::Equal.to_string() {
+        if input.split_count == 0 {
+            input.split_count = unit.occupant_count;
+        }
+        if input.split_count == 0 {
+            return Err(ServiceError::validation(
+                "set the number of tenants living in this unit first, or record the expense without a split",
+            ));
+        }
+    } else {
+        input.split_count = 0;
     }
-    let amounts = equal_split(amount_minor, people.len());
-    Ok(people.iter().zip(amounts).map(|(o, a)| (o.id, a)).collect())
+    Ok(())
 }
 
 pub async fn create(
@@ -115,21 +149,9 @@ pub async fn create(
 ) -> ServiceResult<ExpenseRow> {
     caller.require(Capability::ManageExpenses)?;
     validate(&mut input)?;
-    units::find(pool, input.unit_id)
-        .await?
-        .ok_or(ServiceError::NotFound("unit"))?;
     let mut tx = pool.begin().await?;
+    resolve_split(&mut *tx, &mut input).await?;
     let id = expenses::insert(&mut *tx, &input, caller.user_id).await?;
-    if input.split_method == SplitMethod::Equal.to_string() {
-        let shares = equal_shares(
-            &mut tx,
-            input.unit_id,
-            input.expense_date,
-            input.amount_minor,
-        )
-        .await?;
-        expenses::replace_shares(&mut tx, id, &shares).await?;
-    }
     let row = expenses::find(&mut *tx, id)
         .await?
         .ok_or(ServiceError::NotFound("expense"))?;
@@ -150,38 +172,11 @@ pub async fn update(
     let before = expenses::find(&mut *tx, id)
         .await?
         .ok_or(ServiceError::NotFound("expense"))?;
-    units::find(&mut *tx, input.unit_id)
-        .await?
-        .ok_or(ServiceError::NotFound("unit"))?;
+    resolve_split(&mut *tx, &mut input).await?;
     expenses::update(&mut *tx, id, &input).await?;
-    // Keep the shares consistent with the new amount / method.
-    match input
-        .split_method
-        .parse::<SplitMethod>()
-        .unwrap_or(SplitMethod::None)
-    {
-        SplitMethod::None => expenses::replace_shares(&mut tx, id, &[]).await?,
-        SplitMethod::Equal => {
-            let shares = equal_shares(
-                &mut tx,
-                input.unit_id,
-                input.expense_date,
-                input.amount_minor,
-            )
-            .await?;
-            expenses::replace_shares(&mut tx, id, &shares).await?;
-        }
-        SplitMethod::Custom => {
-            // Existing custom shares stay unless the total changed; then they must be re-entered.
-            let existing = expenses::shares(&mut *tx, id).await?;
-            let sum: i64 = existing.iter().map(|s| s.amount_minor).sum();
-            if before.amount_minor != input.amount_minor
-                || before.unit_id != input.unit_id
-                || sum != input.amount_minor
-            {
-                expenses::replace_shares(&mut tx, id, &[]).await?;
-            }
-        }
+    // A different bill means the payments collected so far no longer apply.
+    if before.amount_minor != input.amount_minor {
+        expenses::set_settled_count(&mut *tx, id, 0).await?;
     }
     let after = expenses::find(&mut *tx, id)
         .await?
@@ -221,112 +216,71 @@ pub async fn delete(pool: &PgPool, caller: &Session, id: Uuid) -> ServiceResult<
     Ok(())
 }
 
-/// Splits the bill evenly between the occupants present on the expense date.
+/// Splits the bill evenly between `count` people (default: the unit's head count).
+/// Payments collected so far are reset — the shares changed.
 pub async fn split_equal(
     pool: &PgPool,
     caller: &Session,
     id: Uuid,
+    count: Option<i32>,
 ) -> ServiceResult<ExpenseDetail> {
     caller.require(Capability::ManageExpenses)?;
     let mut tx = pool.begin().await?;
-    let mut e = expenses::find(&mut *tx, id)
+    let e = expenses::find(&mut *tx, id)
         .await?
         .ok_or(ServiceError::NotFound("expense"))?;
-    let shares = equal_shares(&mut tx, e.unit_id, e.expense_date, e.amount_minor).await?;
-    expenses::replace_shares(&mut tx, id, &shares).await?;
-    if e.split_method != SplitMethod::Equal.to_string() {
-        e.split_method = SplitMethod::Equal.to_string();
-        let input = row_to_input(&e);
-        expenses::update(&mut *tx, id, &input).await?;
-    }
+    let mut input = row_to_input(&e);
+    input.split_method = SplitMethod::Equal.to_string();
+    input.split_count = count.unwrap_or(0);
+    validate(&mut input)?;
+    resolve_split(&mut *tx, &mut input).await?;
+    expenses::update(&mut *tx, id, &input).await?;
+    expenses::set_settled_count(&mut *tx, id, 0).await?;
     audit_log::log(
         &mut *tx,
         caller,
         "expense",
         id,
         "SPLIT_EQUAL",
-        NONE,
-        Some(&shares.len()),
+        Some(&e.split_count),
+        Some(&input.split_count),
     )
     .await?;
     tx.commit().await?;
     get(pool, caller, id).await
 }
 
-/// Custom shares entered by hand; they must add up to the bill exactly.
-pub async fn set_shares(
-    pool: &PgPool,
-    caller: &Session,
-    id: Uuid,
-    shares: Vec<(Uuid, i64)>,
-) -> ServiceResult<ExpenseDetail> {
-    caller.require(Capability::ManageExpenses)?;
-    let mut tx = pool.begin().await?;
-    let mut e = expenses::find(&mut *tx, id)
-        .await?
-        .ok_or(ServiceError::NotFound("expense"))?;
-    let amounts: Vec<i64> = shares.iter().map(|(_, a)| *a).collect();
-    if !shares_cover(e.amount_minor, &amounts) {
-        return Err(ServiceError::validation(
-            "the shares must be zero or more and add up to the full amount",
-        ));
-    }
-    let mut seen = std::collections::HashSet::new();
-    for (occupant_id, _) in &shares {
-        if !seen.insert(*occupant_id) {
-            return Err(ServiceError::validation("an occupant is listed twice"));
-        }
-        let o = occupants::find(&mut *tx, *occupant_id)
-            .await?
-            .ok_or(ServiceError::NotFound("occupant"))?;
-        if o.unit_id != e.unit_id {
-            return Err(ServiceError::validation(
-                "shares can only go to occupants of the same unit",
-            ));
-        }
-    }
-    expenses::replace_shares(&mut tx, id, &shares).await?;
-    e.split_method = SplitMethod::Custom.to_string();
-    expenses::update(&mut *tx, id, &row_to_input(&e)).await?;
-    audit_log::log(
-        &mut *tx,
-        caller,
-        "expense",
-        id,
-        "SPLIT_CUSTOM",
-        NONE,
-        Some(&shares.len()),
-    )
-    .await?;
-    tx.commit().await?;
-    get(pool, caller, id).await
-}
-
+/// Records how many of the people have paid their share (0 ..= split_count).
 pub async fn settle(
     pool: &PgPool,
     caller: &Session,
     id: Uuid,
-    occupant_id: Uuid,
-    settled: bool,
+    settled_count: i32,
 ) -> ServiceResult<ExpenseDetail> {
     caller.require(Capability::ManageExpenses)?;
     let mut tx = pool.begin().await?;
-    if !expenses::set_share_settled(&mut *tx, id, occupant_id, settled).await? {
-        return Err(ServiceError::NotFound("expense share"));
+    let e = expenses::find(&mut *tx, id)
+        .await?
+        .ok_or(ServiceError::NotFound("expense"))?;
+    if e.split_method != SplitMethod::Equal.to_string() {
+        return Err(ServiceError::validation(
+            "this expense is not split, so there is nothing to collect",
+        ));
     }
-    let action = if settled {
-        "SHARE_SETTLED"
-    } else {
-        "SHARE_UNSETTLED"
-    };
+    if !(0..=e.split_count).contains(&settled_count) {
+        return Err(ServiceError::validation(
+            "the number paid must be between zero and the number of people",
+        ));
+    }
+    expenses::set_settled_count(&mut *tx, id, settled_count).await?;
     audit_log::log(
         &mut *tx,
         caller,
         "expense",
         id,
-        action,
-        NONE,
-        Some(&occupant_id),
+        "SETTLED_COUNT_CHANGED",
+        Some(&e.settled_count),
+        Some(&settled_count),
     )
     .await?;
     tx.commit().await?;
@@ -345,6 +299,7 @@ fn row_to_input(e: &ExpenseRow) -> ExpenseInput {
         vendor: e.vendor.clone(),
         reference: e.reference.clone(),
         split_method: e.split_method.clone(),
+        split_count: e.split_count,
         notes: e.notes.clone(),
     }
 }
@@ -428,4 +383,46 @@ pub async fn summary(
         by_unit,
         by_category,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(method: &str, amount: i64, split: i32, settled: i32) -> ExpenseRow {
+        ExpenseRow {
+            id: Uuid::nil(),
+            unit_id: Uuid::nil(),
+            unit_number: "101".into(),
+            building_id: Uuid::nil(),
+            building_name: "B".into(),
+            category: "WATER".into(),
+            description: "bill".into(),
+            amount_minor: amount,
+            expense_date: NaiveDate::from_ymd_opt(2026, 9, 1).unwrap(),
+            period_start: None,
+            period_end: None,
+            vendor: None,
+            reference: None,
+            split_method: method.into(),
+            notes: None,
+            split_count: split,
+            settled_count: settled,
+            created_by_name: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn shares_follow_the_split_and_the_paid_count() {
+        let s = shares_of(&row("EQUAL", 10_000, 3, 1));
+        assert_eq!(s.len(), 3);
+        assert_eq!(s[0].amount_minor, 3_334);
+        assert!(s[0].settled);
+        assert!(!s[1].settled);
+        assert_eq!(s.iter().map(|x| x.amount_minor).sum::<i64>(), 10_000);
+        assert!(shares_of(&row("NONE", 10_000, 3, 1)).is_empty());
+        assert!(shares_of(&row("EQUAL", 10_000, 0, 0)).is_empty());
+    }
 }

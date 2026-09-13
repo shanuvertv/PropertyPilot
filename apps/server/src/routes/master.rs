@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::auth::CurrentUser;
 use crate::dto;
 use crate::error::ApiFailure;
-use crate::state::AppState;
+use crate::state::{AppState, LiveEvent};
 
 pub fn list_query(p: &ListParams) -> ListQuery {
     ListQuery::new(
@@ -143,6 +143,7 @@ fn unit_input(i: UnitInput) -> Result<renewal_db::units::UnitInput, ApiFailure> 
         floor: i.floor,
         unit_type: i.unit_type,
         status: i.status.to_string(),
+        occupant_count: dto::count(i.occupant_count, "number of tenants")?,
         notes: i.notes,
     })
 }
@@ -173,6 +174,19 @@ pub async fn set_unit_status(
     Json(req): Json<SetUnitStatusRequest>,
 ) -> Result<Json<UnitSummary>, ApiFailure> {
     let row = units::set_status(&state.pool, &caller, id, req.status).await?;
+    Ok(Json(dto::unit(row)))
+}
+
+/// How many people live in the unit (Operations may set this without editing the unit).
+pub async fn set_unit_occupant_count(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SetOccupantCountRequest>,
+) -> Result<Json<UnitSummary>, ApiFailure> {
+    let n = dto::count(req.occupant_count, "number of tenants")?;
+    let row = units::set_occupant_count(&state.pool, &caller, id, n).await?;
+    state.publish(LiveEvent::data());
     Ok(Json(dto::unit(row)))
 }
 

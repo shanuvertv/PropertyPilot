@@ -1,11 +1,11 @@
-//! Occupants per unit, expenses per unit with bill splitting, and the expenses dashboard.
+//! Expenses per unit with bill splitting, and the expenses dashboard.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use renewal_api::*;
 use renewal_db::expenses::ExpenseFilter;
-use renewal_services::{expenses, occupants};
+use renewal_services::expenses;
 use uuid::Uuid;
 
 use crate::auth::CurrentUser;
@@ -13,127 +13,6 @@ use crate::dto;
 use crate::error::ApiFailure;
 use crate::routes::master::list_query;
 use crate::state::{AppState, LiveEvent};
-
-// ---------------------------------------------------------------- occupants
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OccupantsQuery {
-    pub include_past: Option<bool>,
-}
-
-pub async fn list_occupants(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Path(unit_id): Path<Uuid>,
-    Query(q): Query<OccupantsQuery>,
-) -> Result<Json<Vec<Occupant>>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let rows = occupants::for_unit(
-        &state.pool,
-        &caller,
-        unit_id,
-        q.include_past.unwrap_or(false),
-    )
-    .await?;
-    Ok(Json(
-        rows.into_iter().map(|o| dto::occupant(o, today)).collect(),
-    ))
-}
-
-pub async fn create_occupant(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Path(unit_id): Path<Uuid>,
-    Json(input): Json<OccupantInput>,
-) -> Result<(StatusCode, Json<Occupant>), ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let row =
-        occupants::create(&state.pool, &caller, unit_id, dto::occupant_input(&input)?).await?;
-    state.publish(LiveEvent::data());
-    Ok((StatusCode::CREATED, Json(dto::occupant(row, today))))
-}
-
-pub async fn update_occupant(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Path(id): Path<Uuid>,
-    Json(input): Json<OccupantInput>,
-) -> Result<Json<Occupant>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let row = occupants::update(&state.pool, &caller, id, dto::occupant_input(&input)?).await?;
-    state.publish(LiveEvent::data());
-    Ok(Json(dto::occupant(row, today)))
-}
-
-pub async fn move_out_occupant(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Path(id): Path<Uuid>,
-    Json(req): Json<MoveOutRequest>,
-) -> Result<Json<Occupant>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let row = occupants::move_out(
-        &state.pool,
-        &caller,
-        id,
-        dto::date_opt(&req.move_out, "move-out date")?,
-    )
-    .await?;
-    state.publish(LiveEvent::data());
-    Ok(Json(dto::occupant(row, today)))
-}
-
-pub async fn delete_occupant(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Path(id): Path<Uuid>,
-) -> Result<StatusCode, ApiFailure> {
-    occupants::delete(&state.pool, &caller, id).await?;
-    state.publish(LiveEvent::data());
-    Ok(StatusCode::NO_CONTENT)
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OccupantSearchQuery {
-    pub q: Option<String>,
-    pub page: Option<i64>,
-    pub page_size: Option<i64>,
-    pub sort: Option<String>,
-    pub dir: Option<String>,
-    pub building_id: Option<String>,
-    pub unit_id: Option<String>,
-    pub tenant_id: Option<String>,
-    pub current: Option<bool>,
-}
-
-/// All occupants across units, searchable (People).
-pub async fn search_occupants(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Query(p): Query<OccupantSearchQuery>,
-) -> Result<Json<Page<Occupant>>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let f = renewal_db::occupants::OccupantFilter {
-        building_id: dto::uuid_opt(&p.building_id, "building")?,
-        unit_id: dto::uuid_opt(&p.unit_id, "unit")?,
-        tenant_id: dto::uuid_opt(&p.tenant_id, "tenant")?,
-        current: p.current,
-    };
-    let lp = ListParams {
-        q: p.q.clone(),
-        page: p.page,
-        page_size: p.page_size,
-        sort: p.sort.clone().or_else(|| Some("name".into())),
-        dir: p.dir.clone(),
-    };
-    let q = list_query(&lp);
-    let page = occupants::search(&state.pool, &caller, &f, &q).await?;
-    Ok(Json(dto::page(page, q.page, q.page_size, |o| {
-        dto::occupant(o, today)
-    })))
-}
 
 // ---------------------------------------------------------------- expenses
 
@@ -193,9 +72,8 @@ pub async fn get_expense(
     CurrentUser(caller): CurrentUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ExpenseDetail>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
     let detail = expenses::get(&state.pool, &caller, id).await?;
-    Ok(Json(dto::expense_detail(detail, today)))
+    Ok(Json(dto::expense_detail(detail)))
 }
 
 pub async fn update_expense(
@@ -219,46 +97,33 @@ pub async fn delete_expense(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Split the bill evenly between N people (default: the unit's number of tenants).
 pub async fn split_equal(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,
     Path(id): Path<Uuid>,
+    req: Option<Json<SplitRequest>>,
 ) -> Result<Json<ExpenseDetail>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let detail = expenses::split_equal(&state.pool, &caller, id).await?;
+    let count = match req.and_then(|Json(r)| r.split_count) {
+        Some(n) => Some(dto::count(n, "number of people")?),
+        None => None,
+    };
+    let detail = expenses::split_equal(&state.pool, &caller, id, count).await?;
     state.publish(LiveEvent::data());
-    Ok(Json(dto::expense_detail(detail, today)))
+    Ok(Json(dto::expense_detail(detail)))
 }
 
-pub async fn set_shares(
+/// Record how many people have paid their share.
+pub async fn settle(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,
     Path(id): Path<Uuid>,
-    Json(req): Json<SetSharesRequest>,
-) -> Result<Json<ExpenseDetail>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let mut shares = Vec::with_capacity(req.shares.len());
-    for s in &req.shares {
-        shares.push((
-            dto::uuid(&s.occupant_id, "occupant")?,
-            dto::minor(s.amount, "share")?,
-        ));
-    }
-    let detail = expenses::set_shares(&state.pool, &caller, id, shares).await?;
-    state.publish(LiveEvent::data());
-    Ok(Json(dto::expense_detail(detail, today)))
-}
-
-pub async fn settle_share(
-    State(state): State<AppState>,
-    CurrentUser(caller): CurrentUser,
-    Path((id, occupant_id)): Path<(Uuid, Uuid)>,
     Json(req): Json<SettleRequest>,
 ) -> Result<Json<ExpenseDetail>, ApiFailure> {
-    let today = renewal_db::today(&state.pool).await?;
-    let detail = expenses::settle(&state.pool, &caller, id, occupant_id, req.settled).await?;
+    let n = dto::count(req.settled_count, "number paid")?;
+    let detail = expenses::settle(&state.pool, &caller, id, n).await?;
     state.publish(LiveEvent::data());
-    Ok(Json(dto::expense_detail(detail, today)))
+    Ok(Json(dto::expense_detail(detail)))
 }
 
 #[derive(serde::Deserialize)]

@@ -18,22 +18,22 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Automation: daily sweep marks expired contracts, opens cases, fires reminder rules once
   each; notification centre with live updates and native toasts
 - Reports (5) with Excel/PDF export; full audit trail with per-record history
-- Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Operations manage occupants, Management view expenses)
+- Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Operations set the number of tenants per unit, Management view expenses)
 - Excel import of an existing tenant list (preview, then commit; safe to re-run)
 - Android app: the same screens with bottom tabs and card lists; token kept in the app's
   private storage; works over the LAN or the internet (HTTPS)
 - Browser version: the server serves the same UI at `https://<server>/` (set `WEB_DIR` or put
   the `web/` build next to the executable) — no install needed
 - Search and filters on every list: `Ctrl+K` global search (buildings, units, tenants,
-  contracts, occupants, expenses), a search box plus building / status / type / date filters on
+  contracts, expenses), a search box plus building / status / type / date filters on
   each page, and a quick filter on every detail-page table
 - Table or card layout on every list (the toggle next to the filters, remembered per list):
   cards show the key figures at a glance — unit counts, contract end and days left, amounts,
   status badges — with the row actions underneath
-- Occupants per unit (shared accommodation): who lives where, move-in/out dates
-- Expenses per unit: bills and costs by category, split equally or by custom amounts between
-  the occupants present on the bill date, per-person settlement, attached bills; dashboard
-  with monthly trend and totals per property, per unit and per category
+- Number of tenants per unit (a count, set on the unit — no per-person register)
+- Expenses per unit: bills and costs by category, split equally between that many tenants
+  with a "paid so far" count, attached bills; dashboard with monthly trend and totals per
+  property, per unit and per category, plus what is still outstanding from the tenants
 
 ## Layout
 
@@ -256,7 +256,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `settings/mail`, `settings/mail/test`, `system/sweep`, `system/status` |
 | Reports & audit | `reports/{kind}` (`?format=xlsx|pdf`), `audit`, `audit/{entityType}/{id}` |
 | Import | `import/preview`, `import/commit` (multipart `file` = .xlsx) |
-| Occupants & expenses | `units/{id}/occupants`, `occupants/{id}`, `occupants/{id}/move-out`, `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/shares`, `expenses/{id}/shares/{occupantId}/settled` |
+| Tenants per unit & expenses | `units/{id}/occupant-count`, `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/settled` |
 | Dashboard | `dashboard`, `search` |
 
 Errors are always `{ "error": { "code": "...", "message": "..." } }`.
