@@ -560,7 +560,7 @@ fn money(minor: i64) -> f64 {
 
 /// Major units from the wire (`1234.56`) to minor units, rounded to the fils.
 pub fn minor(amount: f64, what: &str) -> Result<i64, ApiFailure> {
-    if !amount.is_finite() || amount < 0.0 || amount > 1.0e12 {
+    if !amount.is_finite() || !(0.0..=1.0e12).contains(&amount) {
         return Err(ApiFailure(ServiceError::validation(format!(
             "{what} is not a valid amount"
         ))));
