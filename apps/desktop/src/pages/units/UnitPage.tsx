@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Expense, Occupant, OccupantInput } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
 import { HorizontalBars, MonthlyTrend, categoryColor } from "@/components/charts";
-import { DataTable, type Column } from "@/components/DataTable";
+import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { errorMessage, FormDialog, selectClass, TextAreaField, TextField } from "@/components/forms";
 import { SearchBox } from "@/components/SearchBox";
 import { useLocalFilter } from "@/lib/local-filter";
@@ -127,14 +127,15 @@ function OccupantsTab({ unitId }: { unitId: string }) {
     onError: (e) => setError(errorMessage(e, "Could not update the occupant.")),
   });
 
+  const [view, setView] = useViewMode("unit-occupants");
   const columns: Column<Occupant>[] = [
     { key: "name", header: "Name", card: "title", render: (o) => <span className="font-medium">{o.fullName}{!o.current && <Badge variant="outline" className="ml-2">Moved out</Badge>}</span> },
-    { key: "bed", header: "Bed", render: (o) => o.bedLabel ?? "—" },
-    { key: "tenant", header: "Company", render: (o) => o.tenantName ?? "—" },
+    { key: "bed", header: "Bed", card: "metric", render: (o) => o.bedLabel ?? "—" },
+    { key: "tenant", header: "Company", card: "subtitle", render: (o) => o.tenantName ?? "—" },
     { key: "phone", header: "Phone", render: (o) => o.phone ?? "—" },
     { key: "idn", header: "ID number", render: (o) => o.idNumber ?? "—" },
-    { key: "in", header: "Moved in", render: (o) => formatDate(o.moveIn) },
-    { key: "out", header: "Moved out", render: (o) => (o.moveOut ? formatDate(o.moveOut) : "—") },
+    { key: "in", header: "Moved in", card: "metric", render: (o) => formatDate(o.moveIn) },
+    { key: "out", header: "Moved out", card: "metric", render: (o) => (o.moveOut ? formatDate(o.moveOut) : "—") },
     {
       key: "actions",
       header: "",
@@ -167,6 +168,7 @@ function OccupantsTab({ unitId }: { unitId: string }) {
             <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
             Show past occupants
           </label>
+          <ViewToggle value={view} onChange={setView} />
           {manage && (
             <Button size="sm" onClick={() => setDialog({ edit: null })}>
               <Plus data-icon="inline-start" />
@@ -180,7 +182,7 @@ function OccupantsTab({ unitId }: { unitId: string }) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <DataTable columns={columns} rows={filter.filtered} rowKey={(o) => o.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load occupants.") : null} empty={filter.q ? "No occupant matches the search." : "Nobody is recorded in this unit yet."} />
+      <DataTable view={view} columns={columns} rows={filter.filtered} rowKey={(o) => o.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load occupants.") : null} empty={filter.q ? "No occupant matches the search." : "Nobody is recorded in this unit yet."} />
 
       <OccupantDialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)} unitId={unitId} edit={dialog?.edit ?? null} onSaved={refresh} />
       <MoveOutDialog occupant={moveOut} onOpenChange={(o) => !o && setMoveOut(null)} onSaved={refresh} />
@@ -261,12 +263,13 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
   const monthly = useMemo(() => (summary.data?.monthly ?? []).map((m) => ({ label: formatMonth(m.month), amount: m.amount, count: m.expenseCount })), [summary.data]);
   const byCategory = useMemo(() => (summary.data?.byCategory ?? []).map((c) => ({ id: c.category, label: EXPENSE_CATEGORY_LABEL[c.category], amount: c.amount, count: c.expenseCount, color: categoryColor(c.category) })), [summary.data]);
 
+  const [view, setView] = useViewMode("unit-expenses");
   const columns: Column<Expense>[] = [
-    { key: "date", header: "Date", render: (e) => <span className="tabular-nums whitespace-nowrap">{formatDate(e.expenseDate)}</span> },
+    { key: "date", header: "Date", card: "metric", render: (e) => <span className="tabular-nums whitespace-nowrap">{formatDate(e.expenseDate)}</span> },
     { key: "desc", header: "Description", card: "title", render: (e) => <span className="font-medium">{e.description}</span> },
-    { key: "category", header: "Category", render: (e) => <span className="inline-flex items-center gap-1.5"><span className="inline-block size-2 rounded-full" style={{ background: categoryColor(e.category) }} aria-hidden="true" />{EXPENSE_CATEGORY_LABEL[e.category]}</span> },
-    { key: "amount", header: "Amount", className: "text-right", render: (e) => <span className="tabular-nums">{formatMoney(e.amount)}</span> },
-    { key: "split", header: "Split", render: (e) => <SplitBadge e={e} /> },
+    { key: "category", header: "Category", card: "badge", render: (e) => <span className="inline-flex items-center gap-1.5 text-[12.5px]"><span className="inline-block size-2 rounded-full" style={{ background: categoryColor(e.category) }} aria-hidden="true" />{EXPENSE_CATEGORY_LABEL[e.category]}</span> },
+    { key: "amount", header: "Amount", className: "text-right", card: "metric", render: (e) => <span className="tabular-nums">{formatMoney(e.amount)}</span> },
+    { key: "split", header: "Split", card: "badge", render: (e) => <SplitBadge e={e} /> },
   ];
 
   return (
@@ -297,6 +300,7 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
           <span className="text-[12.5px] text-muted-foreground">
             {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected.` : "All shares settled."}
           </span>
+          <ViewToggle value={view} onChange={setView} />
         </div>
         {can("MANAGE_EXPENSES") && (
           <Button size="sm" onClick={() => setDialog(true)}>
@@ -305,7 +309,7 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
           </Button>
         )}
       </div>
-      <DataTable columns={columns} rows={filter.filtered?.filter((e) => !category || e.category === category)} rowKey={(e) => e.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load expenses.") : null} empty={filter.q || category ? "No expense matches the filters." : "No expenses for this unit yet."} onRowClick={(e) => navigate(`/expenses/${e.id}`)} />
+      <DataTable view={view} columns={columns} rows={filter.filtered?.filter((e) => !category || e.category === category)} rowKey={(e) => e.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load expenses.") : null} empty={filter.q || category ? "No expense matches the filters." : "No expenses for this unit yet."} onRowClick={(e) => navigate(`/expenses/${e.id}`)} />
       <ExpenseDialog
         open={dialog}
         onOpenChange={setDialog}

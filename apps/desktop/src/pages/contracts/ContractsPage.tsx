@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { Band, Contract, ContractStatus } from "@/api/types-domain";
 import { ContractStatusBadge, ExpiryChip, RenewalStatusBadge } from "@/components/badges";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
@@ -40,16 +40,17 @@ export function ContractsPage() {
     placeholderData: (prev) => prev,
   });
 
+  const [view, setView] = useViewMode("contracts");
   const columns: Column<Contract>[] = [
-    { key: "no", header: "Contract", sort: "contract_number", render: (c) => <span className="font-medium">{c.contractNumber}</span> },
-    { key: "tenant", header: "Tenant", sort: "tenant_name", render: (c) => <Link to={`/tenants/${c.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{c.tenantName}</Link> },
+    { key: "no", header: "Contract", sort: "contract_number", card: "title", render: (c) => <span className="font-medium">{c.contractNumber}</span> },
+    { key: "tenant", header: "Tenant", sort: "tenant_name", card: "subtitle", render: (c) => <Link to={`/tenants/${c.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{c.tenantName}</Link> },
     { key: "building", header: "Building", sort: "building_name", render: (c) => c.buildingName },
     { key: "units", header: "Units", render: (c) => c.unitNumbers },
     { key: "start", header: "Start", sort: "start_date", render: (c) => formatDate(c.startDate) },
-    { key: "end", header: "End", sort: "end_date", render: (c) => formatDate(c.endDate) },
-    { key: "remaining", header: "Remaining", sort: "remaining_days", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },
-    { key: "status", header: "Status", sort: "status", render: (c) => <ContractStatusBadge status={c.status} /> },
-    { key: "renewal", header: "Renewal", render: (c) => <RenewalStatusBadge status={c.renewalStatus} /> },
+    { key: "end", header: "End", sort: "end_date", card: "metric", render: (c) => formatDate(c.endDate) },
+    { key: "remaining", header: "Remaining", sort: "remaining_days", card: "metric", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },
+    { key: "status", header: "Status", sort: "status", card: "badge", render: (c) => <ContractStatusBadge status={c.status} /> },
+    { key: "renewal", header: "Renewal", card: "badge", render: (c) => <RenewalStatusBadge status={c.renewalStatus} /> },
     { key: "assigned", header: "Assigned to", render: (c) => c.caseAssignedEmployeeName ?? c.assignedEmployeeName ?? "—" },
   ];
 
@@ -93,8 +94,10 @@ export function ContractsPage() {
             </option>
           ))}
         </select>
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
+        view={view}
         columns={columns}
         rows={query.data?.items}
         rowKey={(c) => c.id}

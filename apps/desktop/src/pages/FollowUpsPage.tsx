@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { FollowUp } from "@/api/types-domain";
 import { FollowUpStatusBadge } from "@/components/badges";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { errorMessage } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -63,19 +63,20 @@ export function FollowUpsPage() {
     onError: (e) => setError(errorMessage(e)),
   });
 
+  const [view, setView] = useViewMode("follow-ups");
   const columns: Column<FollowUp>[] = [
-    { key: "due", header: "Due", render: (f) => (
+    { key: "due", header: "Due", card: "metric", render: (f) => (
       <span className={cn("tabular-nums", f.status === "OPEN" && f.daysUntilDue < 0 && "text-destructive")}>
         {formatDate(f.dueDate)}
         {f.status === "OPEN" && f.daysUntilDue < 0 && ` · ${-f.daysUntilDue}d overdue`}
       </span>
     ) },
-    { key: "type", header: "Type", render: (f) => FOLLOW_UP_TYPE_LABEL[f.followUpType] },
+    { key: "type", header: "Type", card: "metric", render: (f) => FOLLOW_UP_TYPE_LABEL[f.followUpType] },
     { key: "tenant", header: "Tenant", card: "title", render: (f) => <Link to={`/tenants/${f.tenantId}`} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>{f.tenantName}</Link> },
-    { key: "contract", header: "Contract", render: (f) => `${f.contractNumber} · ${f.buildingName} ${f.unitNumbers}` },
+    { key: "contract", header: "Contract", card: "subtitle", render: (f) => `${f.contractNumber} · ${f.buildingName} ${f.unitNumbers}` },
     { key: "notes", header: "Notes", render: (f) => <span className="line-clamp-1 max-w-[320px]">{f.notes ?? "—"}</span> },
     { key: "assigned", header: "Assigned", render: (f) => f.assignedEmployeeName ?? "—" },
-    { key: "status", header: "Status", render: (f) => <FollowUpStatusBadge status={f.status} /> },
+    { key: "status", header: "Status", card: "badge", render: (f) => <FollowUpStatusBadge status={f.status} /> },
     {
       key: "actions",
       header: "",
@@ -146,8 +147,10 @@ export function FollowUpsPage() {
           </select>
         )}
         <DateRange from={state.filters.from} to={state.filters.to} onChange={(from, to) => update({ page: 1, filters: { from, to } })} />
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
+        view={view}
         columns={columns}
         rows={query.data?.items}
         rowKey={(f) => f.id}

@@ -23,7 +23,7 @@ export function ContractStatusBadge({ status }: { status: ContractStatus }) {
 }
 
 export function RenewalStatusBadge({ status }: { status: RenewalStatus | null | undefined }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
+  if (!status) return <span className="text-muted-foreground" data-empty="">—</span>;
   const variant =
     status === "RENEWAL_COMPLETED"
       ? "default"
@@ -36,7 +36,7 @@ export function RenewalStatusBadge({ status }: { status: RenewalStatus | null | 
 }
 
 export function NoticeStatusBadge({ status }: { status: NoticeStatus | null | undefined }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
+  if (!status) return <span className="text-muted-foreground" data-empty="">—</span>;
   const variant = status === "SENT" || status === "DELIVERED" ? "default" : status === "FAILED" ? "destructive" : "outline";
   return <Badge variant={variant}>{NOTICE_STATUS_LABEL[status]}</Badge>;
 }

@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { Expense, ExpenseCategory } from "@/api/types-domain";
 import { HorizontalBars, MonthlyTrend, categoryColor } from "@/components/charts";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { errorMessage, selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { DateRange } from "@/components/DateRange";
@@ -97,13 +97,14 @@ export function ExpensesPage() {
   );
   const delta = s && s.lastMonth > 0 ? ((s.thisMonth - s.lastMonth) / s.lastMonth) * 100 : null;
 
+  const [view, setView] = useViewMode("expenses");
   const columns: Column<Expense>[] = [
     { key: "date", header: "Date", sort: "expense_date", render: (e) => <span className="tabular-nums whitespace-nowrap">{formatDate(e.expenseDate)}</span> },
     { key: "desc", header: "Description", card: "title", render: (e) => <span className="font-medium">{e.description}</span> },
-    { key: "unit", header: "Unit", sort: "unit", render: (e) => <Link to={`/units/${e.unitId}`} className="hover:underline" onClick={(ev) => ev.stopPropagation()}>{e.buildingName} · {e.unitNumber}</Link> },
-    { key: "category", header: "Category", sort: "category", render: (e) => <span className="inline-flex items-center gap-1.5"><span className="inline-block size-2 rounded-full" style={{ background: categoryColor(e.category) }} aria-hidden="true" />{EXPENSE_CATEGORY_LABEL[e.category]}</span> },
-    { key: "amount", header: "Amount", sort: "amount", className: "text-right", render: (e) => <span className="tabular-nums whitespace-nowrap">{formatMoney(e.amount)}</span> },
-    { key: "split", header: "Split", render: (e) => <SplitBadge e={e} /> },
+    { key: "unit", header: "Unit", sort: "unit", card: "subtitle", render: (e) => <Link to={`/units/${e.unitId}`} className="hover:underline" onClick={(ev) => ev.stopPropagation()}>{e.buildingName} · {e.unitNumber}</Link> },
+    { key: "category", header: "Category", sort: "category", card: "badge", render: (e) => <span className="inline-flex items-center gap-1.5 text-[12.5px]"><span className="inline-block size-2 rounded-full" style={{ background: categoryColor(e.category) }} aria-hidden="true" />{EXPENSE_CATEGORY_LABEL[e.category]}</span> },
+    { key: "amount", header: "Amount", sort: "amount", className: "text-right", card: "metric", render: (e) => <span className="tabular-nums whitespace-nowrap">{formatMoney(e.amount)}</span> },
+    { key: "split", header: "Split", card: "badge", render: (e) => <SplitBadge e={e} /> },
   ];
 
   return (
@@ -202,8 +203,10 @@ export function ExpensesPage() {
           <input type="checkbox" checked={state.filters.outstanding === "1"} onChange={(e) => update({ page: 1, filters: { outstanding: e.target.checked ? "1" : undefined } })} />
           Unpaid shares only
         </label>
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
+        view={view}
         columns={columns}
         rows={list.data?.items}
         rowKey={(e) => e.id}

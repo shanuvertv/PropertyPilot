@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { Contract, RenewalCase } from "@/api/types-domain";
 import { BandDot, ExpiryChip, RenewalStatusBadge } from "@/components/badges";
-import { DataTable, type Column } from "@/components/DataTable";
+import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { errorMessage } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,13 +37,13 @@ export function DashboardPage() {
   const bandCount = (b: string) => dash.data?.bands.find((x) => x.band === b)?.count ?? 0;
 
   const contractCols = (action: (c: Contract) => React.ReactNode): Column<Contract>[] => [
-    { key: "tenant", header: "Tenant", render: (x) => <span className="font-medium">{x.tenantName}</span> },
-    { key: "building", header: "Building", render: (x) => x.buildingName },
+    { key: "tenant", header: "Tenant", card: "title", render: (x) => <span className="font-medium">{x.tenantName}</span> },
+    { key: "building", header: "Building", card: "subtitle", render: (x) => x.buildingName },
     { key: "unit", header: "Unit", render: (x) => x.unitNumbers },
-    { key: "end", header: "Contract end", render: (x) => formatDate(x.endDate) },
-    { key: "remaining", header: "Remaining", render: (x) => <ExpiryChip band={x.band} days={x.remainingDays} /> },
-    { key: "status", header: "Renewal status", render: (x) => (x.caseId ? <RenewalStatusBadge status={x.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>) },
-    { key: "action", header: "Action", className: "text-right whitespace-nowrap", render: (x) => <span onClick={(e) => e.stopPropagation()}>{action(x)}</span> },
+    { key: "end", header: "Contract end", card: "metric", render: (x) => formatDate(x.endDate) },
+    { key: "remaining", header: "Remaining", card: "metric", render: (x) => <ExpiryChip band={x.band} days={x.remainingDays} /> },
+    { key: "status", header: "Renewal status", card: "badge", render: (x) => (x.caseId ? <RenewalStatusBadge status={x.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>) },
+    { key: "action", header: "", className: "text-right whitespace-nowrap", render: (x) => <span onClick={(e) => e.stopPropagation()}>{action(x)}</span> },
   ];
   const openOrStart = (x: Contract) =>
     x.caseId ? (
@@ -61,8 +61,8 @@ export function DashboardPage() {
     );
 
   const completedCols: Column<RenewalCase>[] = [
-    { key: "tenant", header: "Tenant", render: (x) => <span className="font-medium">{x.tenantName}</span> },
-    { key: "building", header: "Building", render: (x) => x.buildingName },
+    { key: "tenant", header: "Tenant", card: "title", render: (x) => <span className="font-medium">{x.tenantName}</span> },
+    { key: "building", header: "Building", card: "subtitle", render: (x) => x.buildingName },
     { key: "unit", header: "Unit", render: (x) => x.unitNumbers },
     { key: "old", header: "Previous contract", render: (x) => x.contractNumber },
     { key: "new", header: "New contract", render: (x) => (x.outcomeContractId ? <Link to={`/contracts/${x.outcomeContractId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{x.outcomeContractNumber}</Link> : "—") },
@@ -71,6 +71,7 @@ export function DashboardPage() {
   ];
 
   const [quick, setQuick] = useState("");
+  const [view, setView] = useViewMode("dashboard");
   const pick = (x: { tenantName?: string | null; buildingName?: string | null; unitNumbers?: string | null }) => [x.tenantName, x.buildingName, x.unitNumbers];
   const f = <T extends { tenantName?: string | null; buildingName?: string | null; unitNumbers?: string | null }>(rows: T[] | undefined) =>
     rows && quick.trim() ? rows.filter((r) => matchesQuery(quick, pick(r))) : rows;
@@ -138,16 +139,17 @@ export function DashboardPage() {
         "expiry-h",
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <SearchBox value={quick} onChange={setQuick} placeholder="Filter the lists below by tenant, building or unit" />
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
-      {section("Urgent renewals", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.urgentRenewals)} rowKey={(x) => x.id} empty="No urgent renewals." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "urgent-h")}
-      {section("Upcoming contract expiries", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.upcomingExpiries)} rowKey={(x) => x.id} empty="No other contracts expiring soon." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "upcoming-h")}
+      {section("Urgent renewals", <DataTable view={view} columns={contractCols(openOrStart)} rows={f(dash.data?.urgentRenewals)} rowKey={(x) => x.id} empty="No urgent renewals." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "urgent-h")}
+      {section("Upcoming contract expiries", <DataTable view={view} columns={contractCols(openOrStart)} rows={f(dash.data?.upcomingExpiries)} rowKey={(x) => x.id} empty="No other contracts expiring soon." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "upcoming-h")}
       {can("VIEW_RENEWALS") && (
         <>
-          {section("Pending tenant responses", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.pendingTenantResponses)} rowKey={(x) => x.id} empty="No responses pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "responses-h")}
-          {section("Renewal notices pending", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.noticesPending)} rowKey={(x) => x.id} empty="No notices pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "notices-h")}
-          {section("Recently completed renewals", <DataTable columns={completedCols} rows={f(dash.data?.recentlyCompleted)} rowKey={(x) => x.id} empty="No renewals completed in this period." onRowClick={(x) => navigate(`/renewals/${x.id}`)} />, "completed-h")}
+          {section("Pending tenant responses", <DataTable view={view} columns={contractCols(openOrStart)} rows={f(dash.data?.pendingTenantResponses)} rowKey={(x) => x.id} empty="No responses pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "responses-h")}
+          {section("Renewal notices pending", <DataTable view={view} columns={contractCols(openOrStart)} rows={f(dash.data?.noticesPending)} rowKey={(x) => x.id} empty="No notices pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "notices-h")}
+          {section("Recently completed renewals", <DataTable view={view} columns={completedCols} rows={f(dash.data?.recentlyCompleted)} rowKey={(x) => x.id} empty="No renewals completed in this period." onRowClick={(x) => navigate(`/renewals/${x.id}`)} />, "completed-h")}
         </>
       )}
     </>

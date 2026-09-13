@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 
 import type { Contract, RenewalCase } from "@/api/types-domain";
 import { ContractStatusBadge, ExpiryChip, NoticeStatusBadge, RenewalStatusBadge } from "@/components/badges";
-import { DataTable, type Column } from "@/components/DataTable";
+import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { errorMessage } from "@/components/forms";
@@ -43,22 +43,23 @@ export function TenantDetailPage() {
     }
   }
 
+  const [view, setView] = useViewMode("tenant-contracts");
   const contractCols: Column<Contract>[] = [
-    { key: "no", header: "Contract", render: (c) => <Link to={`/contracts/${c.id}`} className="font-medium hover:underline">{c.contractNumber}</Link> },
-    { key: "building", header: "Building", render: (c) => c.buildingName },
+    { key: "no", header: "Contract", card: "title", render: (c) => <Link to={`/contracts/${c.id}`} className="font-medium hover:underline">{c.contractNumber}</Link> },
+    { key: "building", header: "Building", card: "subtitle", render: (c) => c.buildingName },
     { key: "units", header: "Units", render: (c) => c.unitNumbers },
     { key: "start", header: "Start", render: (c) => formatDate(c.startDate) },
-    { key: "end", header: "End", render: (c) => formatDate(c.endDate) },
-    { key: "remaining", header: "Remaining", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },
-    { key: "status", header: "Status", render: (c) => <ContractStatusBadge status={c.status} /> },
-    { key: "renewal", header: "Renewal", render: (c) => <RenewalStatusBadge status={c.renewalStatus} /> },
+    { key: "end", header: "End", card: "metric", render: (c) => formatDate(c.endDate) },
+    { key: "remaining", header: "Remaining", card: "metric", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },
+    { key: "status", header: "Status", card: "badge", render: (c) => <ContractStatusBadge status={c.status} /> },
+    { key: "renewal", header: "Renewal", card: "badge", render: (c) => <RenewalStatusBadge status={c.renewalStatus} /> },
   ];
 
   const caseCols: Column<RenewalCase>[] = [
-    { key: "opened", header: "Opened", render: (c) => formatDate(c.openedAt) },
-    { key: "contract", header: "Contract", render: (c) => <Link to={`/contracts/${c.contractId}`} className="hover:underline">{c.contractNumber}</Link> },
-    { key: "status", header: "Status", render: (c) => <RenewalStatusBadge status={c.status} /> },
-    { key: "notice", header: "Notice", render: (c) => <NoticeStatusBadge status={c.noticeStatus} /> },
+    { key: "opened", header: "Opened", card: "metric", render: (c) => formatDate(c.openedAt) },
+    { key: "contract", header: "Contract", card: "title", render: (c) => <Link to={`/contracts/${c.contractId}`} className="hover:underline">{c.contractNumber}</Link> },
+    { key: "status", header: "Status", card: "badge", render: (c) => <RenewalStatusBadge status={c.status} /> },
+    { key: "notice", header: "Notice", card: "badge", render: (c) => <NoticeStatusBadge status={c.noticeStatus} /> },
     { key: "response", header: "Tenant response", render: (c) => (c.latestResponse ? `${TENANT_RESPONSE_LABEL[c.latestResponse]} · ${formatDateTime(c.latestResponseAt)}` : "—") },
     { key: "outcome", header: "Outcome", render: (c) => (c.outcomeContractId ? <Link to={`/contracts/${c.outcomeContractId}`} className="hover:underline">{c.outcomeContractNumber}</Link> : "—") },
   ];
@@ -112,18 +113,24 @@ export function TenantDetailPage() {
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
         <TabsContent value="current" className="pt-4">
-          <div className="mb-3"><SearchBox value={contractFilter.q} onChange={contractFilter.setQ} placeholder="Search contract, building, unit or status" /></div>
-          <DataTable columns={contractCols} rows={current} rowKey={(c) => c.id} empty="No active contracts. Create one from Contracts." />
+          <div className="mb-3 flex items-center gap-2">
+            <SearchBox value={contractFilter.q} onChange={contractFilter.setQ} placeholder="Search contract, building, unit or status" />
+            <ViewToggle value={view} onChange={setView} className="ml-auto" />
+          </div>
+          <DataTable view={view} columns={contractCols} rows={current} rowKey={(c) => c.id} empty="No active contracts. Create one from Contracts." />
         </TabsContent>
         <TabsContent value="past" className="flex flex-col gap-6 pt-4">
-          <SearchBox value={contractFilter.q} onChange={contractFilter.setQ} placeholder="Search contract, building, unit or status" />
+          <div className="flex items-center gap-2">
+            <SearchBox value={contractFilter.q} onChange={contractFilter.setQ} placeholder="Search contract, building, unit or status" />
+            <ViewToggle value={view} onChange={setView} className="ml-auto" />
+          </div>
           <section>
             <h3 className="mb-2 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">Previous contracts</h3>
-            <DataTable columns={contractCols} rows={history} rowKey={(c) => c.id} empty="No previous contracts." />
+            <DataTable view={view} columns={contractCols} rows={history} rowKey={(c) => c.id} empty="No previous contracts." />
           </section>
           <section>
             <h3 className="mb-2 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">Renewals, notices and responses</h3>
-            <DataTable columns={caseCols} rows={detail.data.cases} rowKey={(c) => c.id} empty="No renewal cases yet." onRowClick={can("VIEW_RENEWALS") ? (c) => navigate(`/renewals/${c.id}`) : undefined} />
+            <DataTable view={view} columns={caseCols} rows={detail.data.cases} rowKey={(c) => c.id} empty="No renewal cases yet." onRowClick={can("VIEW_RENEWALS") ? (c) => navigate(`/renewals/${c.id}`) : undefined} />
           </section>
         </TabsContent>
         <TabsContent value="communications" className="pt-4">

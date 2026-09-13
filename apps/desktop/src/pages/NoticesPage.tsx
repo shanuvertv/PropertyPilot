@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { Band, NoticeStatus, RenewalCase } from "@/api/types-domain";
 import { ExpiryChip, NoticeStatusBadge, RenewalStatusBadge } from "@/components/badges";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
@@ -40,17 +40,18 @@ export function NoticesPage() {
     placeholderData: (prev) => prev,
   });
 
+  const [view, setView] = useViewMode("notices");
   const columns: Column<RenewalCase>[] = [
-    { key: "tenant", header: "Tenant", sort: "tenant_name", render: (c) => <span className="font-medium">{c.tenantName}</span> },
-    { key: "building", header: "Building", render: (c) => c.buildingName },
+    { key: "tenant", header: "Tenant", sort: "tenant_name", card: "title", render: (c) => <span className="font-medium">{c.tenantName}</span> },
+    { key: "building", header: "Building", card: "subtitle", render: (c) => c.buildingName },
     { key: "unit", header: "Unit", render: (c) => c.unitNumbers },
-    { key: "expiry", header: "Expiry", sort: "end_date", render: (c) => <span>{formatDate(c.endDate)} <ExpiryChip band={c.band} days={c.remainingDays} /></span> },
+    { key: "expiry", header: "Expiry", sort: "end_date", card: "metric", render: (c) => <span>{formatDate(c.endDate)} <ExpiryChip band={c.band} days={c.remainingDays} /></span> },
     { key: "required", header: "Notice required", render: (c) => (c.noticeStatus === "NOT_REQUIRED" ? "No" : "Yes") },
     { key: "sent", header: "Notice sent", render: (c) => (c.noticeSentAt ? "Yes" : "No") },
     { key: "sentDate", header: "Sent date", render: (c) => (c.noticeSentAt ? formatDateTime(c.noticeSentAt) : "—") },
     { key: "response", header: "Response", render: (c) => (c.latestResponse ? TENANT_RESPONSE_LABEL[c.latestResponse] : "—") },
-    { key: "status", header: "Notice status", sort: "status", render: (c) => <NoticeStatusBadge status={c.noticeStatus} /> },
-    { key: "case", header: "Case", render: (c) => <RenewalStatusBadge status={c.status} /> },
+    { key: "status", header: "Notice status", sort: "status", card: "badge", render: (c) => <NoticeStatusBadge status={c.noticeStatus} /> },
+    { key: "case", header: "Case", card: "badge", render: (c) => <RenewalStatusBadge status={c.status} /> },
     { key: "assigned", header: "Employee", render: (c) => c.assignedEmployeeName ?? "—" },
     { key: "actions", header: "", className: "text-right", card: "hidden", render: (c) => <span onClick={(e) => e.stopPropagation()}><Button size="xs" variant="ghost" onClick={() => navigate(`/renewals/${c.id}`)}>Open</Button></span> },
   ];
@@ -100,8 +101,10 @@ export function NoticesPage() {
           <input type="checkbox" checked={state.filters.includeClosed === "true"} onChange={(e) => update({ filters: { includeClosed: e.target.checked ? "true" : undefined } })} />
           Include closed cases
         </label>
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
+        view={view}
         columns={columns}
         rows={query.data?.items}
         rowKey={(c) => c.id}

@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 
 import type { UnitSummary } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
-import { DataTable, type Column } from "@/components/DataTable";
+import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { errorMessage } from "@/components/forms";
@@ -60,15 +60,16 @@ export function BuildingDetailPage() {
     }
   }
 
+  const [view, setView] = useViewMode("building-units");
   const unitColumns: Column<UnitSummary>[] = [
     { key: "unit", header: "Unit", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
     { key: "floor", header: "Floor", render: (u) => u.floor ?? "—" },
     { key: "type", header: "Type", render: (u) => u.unitType ?? "—" },
-    { key: "status", header: "Status", render: (u) => <UnitStatusBadge status={u.status} /> },
+    { key: "status", header: "Status", card: "badge", render: (u) => <UnitStatusBadge status={u.status} /> },
     { key: "tenant", header: "Tenant", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : "—") },
-    { key: "end", header: "Contract end", render: (u) => formatDate(u.endDate) },
-    { key: "remaining", header: "Remaining", render: (u) => <ExpiryChip band={u.band} days={u.remainingDays} /> },
-    { key: "renewal", header: "Renewal", render: (u) => <RenewalStatusBadge status={u.renewalStatus} /> },
+    { key: "end", header: "Contract end", card: "metric", render: (u) => formatDate(u.endDate) },
+    { key: "remaining", header: "Remaining", card: "metric", render: (u) => <ExpiryChip band={u.band} days={u.remainingDays} /> },
+    { key: "renewal", header: "Renewal", card: "badge", render: (u) => <RenewalStatusBadge status={u.renewalStatus} /> },
   ];
 
   if (detail.isError) {
@@ -137,6 +138,7 @@ export function BuildingDetailPage() {
                   <option key={s} value={s}>{UNIT_STATUS_LABEL[s]}</option>
                 ))}
               </select>
+              <ViewToggle value={view} onChange={setView} />
             </div>
             {can("MANAGE_UNITS") && (
               <Button size="sm" onClick={() => setUnitDialog({ open: true, unit: null })}>
@@ -146,6 +148,7 @@ export function BuildingDetailPage() {
             )}
           </div>
           <DataTable
+            view={view}
             columns={unitColumns}
             rows={unitFilter.filtered?.filter((u) => !unitStatus || u.status === unitStatus)}
             rowKey={(u) => u.id}

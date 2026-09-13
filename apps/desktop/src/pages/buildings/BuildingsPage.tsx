@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import type { Building } from "@/api/types-domain";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ export function BuildingsPage() {
   const navigate = useNavigate();
   const { state, update, toggleSort } = useListParams({ sort: "name" });
   const [dialog, setDialog] = useState(false);
+  const [view, setView] = useViewMode("buildings");
 
   const query = useQuery({
     queryKey: ["buildings", "list", state],
@@ -29,9 +30,9 @@ export function BuildingsPage() {
     { key: "code", header: "Code", sort: "code", render: (b) => <span className="font-mono text-[12.5px]">{b.code}</span> },
     { key: "location", header: "Location", sort: "location", render: (b) => b.location ?? "—" },
     { key: "type", header: "Type", sort: "building_type", render: (b) => b.buildingType ?? "—" },
-    { key: "total", header: "Units", sort: "total_units", className: "text-right tabular-nums", render: (b) => b.totalUnits },
-    { key: "occupied", header: "Occupied", sort: "occupied_units", className: "text-right tabular-nums", render: (b) => b.occupiedUnits },
-    { key: "vacant", header: "Vacant", sort: "vacant_units", className: "text-right tabular-nums", render: (b) => b.vacantUnits },
+    { key: "total", header: "Units", sort: "total_units", className: "text-right tabular-nums", card: "metric", render: (b) => b.totalUnits },
+    { key: "occupied", header: "Occupied", sort: "occupied_units", className: "text-right tabular-nums", card: "metric", render: (b) => b.occupiedUnits },
+    { key: "vacant", header: "Vacant", sort: "vacant_units", className: "text-right tabular-nums", card: "metric", render: (b) => b.vacantUnits },
   ];
 
   return (
@@ -50,6 +51,7 @@ export function BuildingsPage() {
       />
       <div className="mb-3 flex items-center gap-2">
         <SearchBox value={state.q} onChange={(q) => update({ q })} placeholder="Search name, code or location" />
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
         columns={columns}
@@ -62,6 +64,7 @@ export function BuildingsPage() {
         dir={state.dir}
         onSort={toggleSort}
         onRowClick={(b) => navigate(`/buildings/${b.id}`)}
+        view={view}
       />
       {query.data && <Paginator page={state.page} pageSize={state.pageSize} total={query.data.total} onPage={(p) => update({ page: p })} />}
       <BuildingDialog open={dialog} onOpenChange={setDialog} onSaved={(b) => navigate(`/buildings/${b.id}`)} />

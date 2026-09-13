@@ -2,7 +2,8 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiRequestError } from "@/api/client";
-import { ROLE_LABEL, ROLES, type Role } from "@/api/types";
+import { ROLE_LABEL, ROLES, type Role, type UserSummary } from "@/api/types";
+import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApp } from "@/lib/app-state";
 import { ChecklistTemplateCard } from "@/pages/settings/ChecklistTemplateCard";
 import { EmailTemplatesCard } from "@/pages/settings/EmailTemplatesCard";
@@ -64,6 +64,35 @@ export function SettingsPage() {
   }
 
   const scheduler = system.data?.scheduler;
+  const [view, setView] = useViewMode("users");
+
+  const userCols: Column<UserSummary>[] = [
+    { key: "name", header: "Name", card: "title", render: (u) => <span className="font-medium">{u.name}</span> },
+    { key: "email", header: "Email", card: "subtitle", render: (u) => <span className="text-muted-foreground">{u.email}</span> },
+    { key: "role", header: "Role", card: "metric", render: (u) => ROLE_LABEL[u.role] },
+    { key: "login", header: "Last sign-in", card: "metric", render: (u) => <span className="text-muted-foreground tabular-nums">{formatWhen(u.lastLoginAt)}</span> },
+    { key: "status", header: "Status", card: "badge", render: (u) => <Badge variant={u.active ? "secondary" : "outline"}>{u.active ? "Active" : "Inactive"}</Badge> },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right whitespace-nowrap",
+      render: (u) => (
+        <span className="inline-flex flex-wrap justify-end gap-1">
+          <Button variant="ghost" size="sm" disabled={u.id === session?.userId} onClick={() => setResetFor({ id: u.id, name: u.name })}>
+            Reset password
+          </Button>
+          <Button variant="ghost" size="sm" disabled={u.id === session?.userId || toggleActive.isPending} onClick={() => toggleActive.mutate({ id: u.id, active: !u.active })}>
+            {u.active ? "Deactivate" : "Activate"}
+          </Button>
+          {!u.active && u.id !== session?.userId && (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteFor({ id: u.id, name: u.name, email: u.email })}>
+              Delete
+            </Button>
+          )}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -92,69 +121,16 @@ export function SettingsPage() {
                     <option key={r} value={r}>{ROLE_LABEL[r]}</option>
                   ))}
                 </select>
+                <ViewToggle value={view} onChange={setView} className="ml-auto" />
               </div>
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Last sign-in</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(userFilter.filtered ?? []).filter((u) => !roleFilter || u.role === roleFilter).map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell className="font-medium">{u.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                        <TableCell>{ROLE_LABEL[u.role]}</TableCell>
-                        <TableCell className="tabular-nums text-muted-foreground">{formatWhen(u.lastLoginAt)}</TableCell>
-                        <TableCell>
-                          <Badge variant={u.active ? "secondary" : "outline"}>{u.active ? "Active" : "Inactive"}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={u.id === session?.userId}
-                            onClick={() => setResetFor({ id: u.id, name: u.name })}
-                          >
-                            Reset password
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={u.id === session?.userId || toggleActive.isPending}
-                            onClick={() => toggleActive.mutate({ id: u.id, active: !u.active })}
-                          >
-                            {u.active ? "Deactivate" : "Activate"}
-                          </Button>
-                          {!u.active && u.id !== session?.userId && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleteFor({ id: u.id, name: u.name, email: u.email })}
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {users.isSuccess && users.data.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
-                          No users yet.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              <DataTable
+                view={view}
+                columns={userCols}
+                rows={userFilter.filtered?.filter((u) => !roleFilter || u.role === roleFilter)}
+                rowKey={(u) => u.id}
+                loading={users.isPending}
+                empty={userFilter.q || roleFilter ? "No user matches the filters." : "No users yet."}
+              />
             </CardContent>
           </Card>
 

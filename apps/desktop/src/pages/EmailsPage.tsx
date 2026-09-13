@@ -4,7 +4,7 @@ import { Plus, RefreshCw } from "lucide-react";
 import { Link } from "react-router";
 
 import type { EmailMessage, EmailStatus } from "@/api/types-domain";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { FormDialog, SelectField, TextAreaField, TextField, errorMessage, selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
@@ -43,14 +43,15 @@ export function EmailsPage() {
     onError: (e) => setError(errorMessage(e)),
   });
 
+  const [layout, setLayout] = useViewMode("emails");
   const columns: Column<EmailMessage>[] = [
-    { key: "date", header: "Date", render: (m) => <span className="tabular-nums">{formatDateTime(m.sentAt ?? m.queuedAt)}</span> },
-    { key: "to", header: "Recipient", render: (m) => <span className="line-clamp-1 max-w-[220px]">{m.to.join(", ")}</span> },
+    { key: "date", header: "Date", card: "metric", render: (m) => <span className="tabular-nums">{formatDateTime(m.sentAt ?? m.queuedAt)}</span> },
+    { key: "to", header: "Recipient", card: "subtitle", render: (m) => <span className="line-clamp-1 max-w-[220px]">{m.to.join(", ")}</span> },
     { key: "subject", header: "Subject", card: "title", render: (m) => <span className="line-clamp-2 max-w-[320px] font-medium">{m.subject}</span> },
     { key: "type", header: "Email type", render: (m) => templates.data?.find((t) => t.key === m.emailType)?.name ?? m.emailType },
     { key: "tenant", header: "Tenant", render: (m) => (m.tenantId ? <Link to={`/tenants/${m.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{m.tenantName}</Link> : "—") },
     { key: "by", header: "Sent by", render: (m) => m.sentByName ?? "—" },
-    { key: "status", header: "Status", render: (m) => <EmailStatusBadge status={m.status} /> },
+    { key: "status", header: "Status", card: "badge", render: (m) => <EmailStatusBadge status={m.status} /> },
     {
       key: "actions",
       header: "",
@@ -105,8 +106,9 @@ export function EmailsPage() {
           ))}
           <option value="CUSTOM">Custom</option>
         </select>
+        <ViewToggle value={layout} onChange={setLayout} className="ml-auto" />
       </div>
-      <DataTable columns={columns} rows={query.data?.items} rowKey={(m) => m.id} loading={query.isPending} error={query.error ? "Could not load emails." : null} empty="No emails yet." onRowClick={(m) => setView(m)} />
+      <DataTable view={layout} columns={columns} rows={query.data?.items} rowKey={(m) => m.id} loading={query.isPending} error={query.error ? "Could not load emails." : null} empty="No emails yet." onRowClick={(m) => setView(m)} />
       {query.data && <Paginator page={state.page} pageSize={state.pageSize} total={query.data.total} onPage={(p) => update({ page: p })} />}
 
       <ComposeDialog open={compose} onOpenChange={setCompose} />

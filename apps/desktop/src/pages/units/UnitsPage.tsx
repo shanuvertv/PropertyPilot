@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { Band, RenewalStatus, UnitStatus, UnitSummary } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { errorMessage, selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
@@ -46,6 +46,7 @@ export function UnitsPage() {
     placeholderData: (prev) => prev,
   });
 
+  const [view, setView] = useViewMode("units");
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: UnitStatus }) => api.setUnitStatus(id, status),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["units"] }),
@@ -53,15 +54,15 @@ export function UnitsPage() {
   });
 
   const columns: Column<UnitSummary>[] = [
-    { key: "building", header: "Building", sort: "building_name", card: "hidden", render: (u) => <Link to={`/buildings/${u.buildingId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.buildingName}</Link> },
-    { key: "unit", header: "Unit", sort: "unit_number", card: "title", render: (u) => <span className="font-medium">{u.unitNumber}<span className="font-normal text-muted-foreground md:hidden"> · {u.buildingName}</span></span> },
+    { key: "building", header: "Building", sort: "building_name", card: "subtitle", render: (u) => <Link to={`/buildings/${u.buildingId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.buildingName}</Link> },
+    { key: "unit", header: "Unit", sort: "unit_number", card: "title", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
     { key: "type", header: "Type", sort: "unit_type", render: (u) => u.unitType ?? "—" },
     { key: "tenant", header: "Tenant", sort: "tenant_name", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : <span className="text-muted-foreground">—</span>) },
     { key: "start", header: "Start", sort: "start_date", render: (u) => formatDate(u.startDate) },
-    { key: "end", header: "End", sort: "end_date", render: (u) => formatDate(u.endDate) },
-    { key: "remaining", header: "Remaining", sort: "remaining_days", render: (u) => <ExpiryChip band={u.band} days={u.remainingDays} /> },
-    { key: "status", header: "Status", sort: "status", render: (u) => <UnitStatusBadge status={u.status} /> },
-    { key: "renewal", header: "Renewal", sort: "renewal_status", render: (u) => <RenewalStatusBadge status={u.renewalStatus} /> },
+    { key: "end", header: "End", sort: "end_date", card: "metric", render: (u) => formatDate(u.endDate) },
+    { key: "remaining", header: "Remaining", sort: "remaining_days", card: "metric", render: (u) => <ExpiryChip band={u.band} days={u.remainingDays} /> },
+    { key: "status", header: "Status", sort: "status", card: "badge", render: (u) => <UnitStatusBadge status={u.status} /> },
+    { key: "renewal", header: "Renewal", sort: "renewal_status", card: "badge", render: (u) => <RenewalStatusBadge status={u.renewalStatus} /> },
     { key: "assigned", header: "Assigned to", render: (u) => u.assignedEmployeeName ?? "—" },
     {
       key: "actions",
@@ -166,8 +167,10 @@ export function UnitsPage() {
             Clear
           </Button>
         )}
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
+        view={view}
         columns={columns}
         rows={query.data?.items}
         rowKey={(u) => u.id}

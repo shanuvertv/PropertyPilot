@@ -27,6 +27,9 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Search and filters on every list: `Ctrl+K` global search (buildings, units, tenants,
   contracts, occupants, expenses), a search box plus building / status / type / date filters on
   each page, and a quick filter on every detail-page table
+- Table or card layout on every list (the toggle next to the filters, remembered per list):
+  cards show the key figures at a glance — unit counts, contract end and days left, amounts,
+  status badges — with the row actions underneath
 - Occupants per unit (shared accommodation): who lives where, move-in/out dates
 - Expenses per unit: bills and costs by category, split equally or by custom amounts between
   the occupants present on the bill date, per-person settlement, attached bills; dashboard

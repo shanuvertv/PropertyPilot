@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 
 import type { Band, Contract, RenewalStatus } from "@/api/types-domain";
 import { BandDot, ExpiryChip, NoticeStatusBadge, RenewalStatusBadge } from "@/components/badges";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
@@ -46,21 +46,22 @@ export function RenewalsPage() {
 
   const bandCount = (b: Band) => dashboard.data?.bands.find((x) => x.band === b)?.count ?? 0;
 
+  const [view, setView] = useViewMode("renewals");
   const columns: Column<Contract>[] = [
     { key: "tenant", header: "Tenant", sort: "tenant_name", render: (c) => (
       <div>
         <div className="font-medium">{c.tenantName}</div>
-        <div className="text-[12px] text-muted-foreground">{c.tenantContact ?? "—"}</div>
+        {c.tenantContact && <div className="text-[12px] text-muted-foreground">{c.tenantContact}</div>}
       </div>
     ) },
-    { key: "building", header: "Building", sort: "building_name", render: (c) => c.buildingName },
+    { key: "building", header: "Building", sort: "building_name", card: "subtitle", render: (c) => c.buildingName },
     { key: "units", header: "Unit", render: (c) => c.unitNumbers },
     { key: "start", header: "Start", sort: "start_date", render: (c) => formatDate(c.startDate) },
-    { key: "end", header: "End", sort: "end_date", render: (c) => formatDate(c.endDate) },
-    { key: "remaining", header: "Remaining", sort: "remaining_days", render: (c) => <ExpiryChip band={c.band} days={c.remainingDays} /> },
+    { key: "end", header: "End", sort: "end_date", card: "metric", render: (c) => formatDate(c.endDate) },
+    { key: "remaining", header: "Remaining", sort: "remaining_days", card: "metric", render: (c) => <ExpiryChip band={c.band} days={c.remainingDays} /> },
     { key: "assigned", header: "Assigned", render: (c) => c.caseAssignedEmployeeName ?? c.assignedEmployeeName ?? "—" },
-    { key: "status", header: "Renewal status", render: (c) => (c.caseId ? <RenewalStatusBadge status={c.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>) },
-    { key: "notice", header: "Notice", render: (c) => <NoticeStatusBadge status={c.caseId ? c.noticeStatus : null} /> },
+    { key: "status", header: "Renewal status", card: "badge", render: (c) => (c.caseId ? <RenewalStatusBadge status={c.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>) },
+    { key: "notice", header: "Notice", card: "badge", render: (c) => <NoticeStatusBadge status={c.caseId ? c.noticeStatus : null} /> },
     {
       key: "actions",
       header: "",
@@ -137,9 +138,11 @@ export function RenewalsPage() {
             Follow-ups →
           </Link>
         )}
+        <ViewToggle value={view} onChange={setView} className={employees.data ? undefined : "ml-auto"} />
       </div>
 
       <DataTable
+        view={view}
         columns={columns}
         rows={query.data?.items}
         rowKey={(c) => c.id}

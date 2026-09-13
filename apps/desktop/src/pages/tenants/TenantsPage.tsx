@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import type { Tenant } from "@/api/types-domain";
-import { DataTable, Paginator, type Column } from "@/components/DataTable";
+import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
 import { selectClass } from "@/components/forms";
@@ -36,13 +36,14 @@ export function TenantsPage() {
     placeholderData: (prev) => prev,
   });
 
+  const [view, setView] = useViewMode("tenants");
   const columns: Column<Tenant>[] = [
     { key: "name", header: "Tenant", sort: "name", render: (t) => <span className="font-medium">{t.name}</span> },
     { key: "contact", header: "Contact person", sort: "contact_person", render: (t) => t.contactPerson ?? "—" },
     { key: "mobile", header: "Mobile", sort: "mobile", render: (t) => t.mobile ?? "—" },
     { key: "email", header: "Email", sort: "email", render: (t) => t.email ?? "—" },
-    { key: "contracts", header: "Active contracts", sort: "active_contracts", className: "text-right tabular-nums", render: (t) => t.activeContracts },
-    { key: "units", header: "Units", className: "text-right tabular-nums", render: (t) => t.currentUnits },
+    { key: "contracts", header: "Active contracts", sort: "active_contracts", className: "text-right tabular-nums", card: "metric", render: (t) => t.activeContracts },
+    { key: "units", header: "Units", className: "text-right tabular-nums", card: "metric", render: (t) => t.currentUnits },
   ];
 
   return (
@@ -59,7 +60,7 @@ export function TenantsPage() {
           )
         }
       />
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <SearchBox value={state.q} onChange={(q) => update({ q, page: 1 })} placeholder="Search name, contact, email or mobile" />
         <select className={`${selectClass} w-auto`} value={state.filters.buildingId ?? ""} onChange={(e) => update({ page: 1, filters: { buildingId: e.target.value || undefined } })} aria-label="Building">
           <option value="">All properties</option>
@@ -72,8 +73,10 @@ export function TenantsPage() {
           <option value="yes">With an active contract</option>
           <option value="no">Without an active contract</option>
         </select>
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
       <DataTable
+        view={view}
         columns={columns}
         rows={query.data?.items}
         rowKey={(t) => t.id}
