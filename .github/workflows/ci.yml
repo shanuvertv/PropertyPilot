@@ -26,6 +26,7 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       DATABASE_URL: postgres://renewal:renewal@localhost:5432/renewal
+      CARGO_TERM_COLOR: never
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -43,7 +44,7 @@ jobs:
         shell: bash
         # One annotation with the first errors, readable from the run page without signing in.
         run: |
-          msg=$(grep -E "^(error|warning)(\[|:)" -A6 clippy.log | head -80 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          msg=$( (grep -E "^(error|warning)(\[|:)" -A6 clippy.log || tail -n 60 clippy.log) | head -80 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}' )
           echo "::error title=clippy::${msg:-no error lines captured}"
       - run: cargo test --workspace --exclude renewal-desktop
 
