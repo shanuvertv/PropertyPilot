@@ -50,7 +50,7 @@
     "targets": "all",
     "android": {
       "minSdkVersion": 26,
-      "versionCode": 3
+      "versionCode": 4
     },
     "icon": [
       "icons/32x32.png",
