@@ -29,6 +29,29 @@ impl IntoResponse for RateLimited {
     }
 }
 
+/// Either way `login` can fail. An enum (not a ready-made `Response`) keeps the
+/// handler's `Err` small — clippy's `result_large_err` rejects a 128-byte `Response`.
+#[derive(Debug)]
+pub enum LoginFailure {
+    RateLimited,
+    Api(ApiFailure),
+}
+
+impl From<ServiceError> for LoginFailure {
+    fn from(e: ServiceError) -> Self {
+        LoginFailure::Api(ApiFailure(e))
+    }
+}
+
+impl IntoResponse for LoginFailure {
+    fn into_response(self) -> Response {
+        match self {
+            LoginFailure::RateLimited => RateLimited.into_response(),
+            LoginFailure::Api(e) => e.into_response(),
+        }
+    }
+}
+
 impl From<ServiceError> for ApiFailure {
     fn from(e: ServiceError) -> Self {
         ApiFailure(e)

@@ -1,6 +1,5 @@
 use axum::extract::{ConnectInfo, Path, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
 use axum::Json;
 use renewal_api::{
     BootstrapRequest, ChangePasswordRequest, LoginRequest, LoginResponse, ResetPasswordRequest,
@@ -12,7 +11,7 @@ use uuid::Uuid;
 
 use crate::auth::{user_agent, CurrentUser};
 use crate::dto::session_info;
-use crate::error::{ApiFailure, RateLimited};
+use crate::error::{ApiFailure, LoginFailure};
 use crate::state::AppState;
 
 pub async fn login(
@@ -20,11 +19,11 @@ pub async fn login(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<LoginResponse>, Response> {
+) -> Result<Json<LoginResponse>, LoginFailure> {
     // Rate limit per (client, mailbox) so one guessed account cannot lock the whole office out.
     let key = format!("{}|{}", peer.ip(), req.email.trim().to_ascii_lowercase());
     if !state.login_limiter.allow(&key) {
-        return Err(RateLimited.into_response());
+        return Err(LoginFailure::RateLimited);
     }
     let issued = auth::login(
         &state.pool,
@@ -32,8 +31,7 @@ pub async fn login(
         &req.password,
         user_agent(&headers).as_deref(),
     )
-    .await
-    .map_err(|e| ApiFailure(e).into_response())?;
+    .await?;
     state.login_limiter.reset(&key);
     Ok(Json(LoginResponse {
         token: issued.token,
