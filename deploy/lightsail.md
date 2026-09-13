@@ -101,6 +101,15 @@ attach the database's private endpoint and let Lightsail terminate HTTPS.
 
 ## 4. HTTPS with Caddy (automatic certificates)
 
+No domain yet? Use the free `sslip.io` name for the static IP — e.g. `13-207-218-150.sslip.io`
+for `13.207.218.150` — as the host in the Caddyfile. Let's Encrypt issues a normal certificate
+for it, and the apps use `https://13-207-218-150.sslip.io`. When you buy a domain, point an
+A record at the IP, change the host in the Caddyfile and `systemctl reload caddy`; the apps
+just get the new address on their Setup screen.
+
+Remember the Lightsail firewall (instance → Networking): it allows only SSH and HTTP by
+default — add **HTTPS (443)** or nothing outside the instance can connect.
+
 ```bash
 sudo apt-get install -y caddy
 sudo cp ~/pp/Caddyfile /etc/caddy/Caddyfile  # edit the host name first
