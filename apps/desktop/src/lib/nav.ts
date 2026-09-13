@@ -10,6 +10,7 @@ import {
   MailCheck,
   Receipt,
   Settings,
+  Upload,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -41,6 +42,7 @@ export const NAV: NavItem[] = [
   { to: "/expenses", label: "Expenses", icon: Receipt, requires: "VIEW_EXPENSES", phase: 10 },
   { to: "/notifications", label: "Notifications", icon: Bell, requires: "VIEW_DASHBOARD", phase: 6 },
   { to: "/reports", label: "Reports", icon: FileText, requires: "VIEW_REPORTS", phase: 7 },
+  { to: "/import", label: "Import data", short: "Import", icon: Upload, requires: "MANAGE_CONTRACTS", phase: 8 },
   { to: "/settings", label: "Settings", icon: Settings, requires: "MANAGE_SETTINGS", phase: 0 },
 ];
 

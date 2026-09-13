@@ -118,6 +118,8 @@ pub struct UnitSummary {
     pub notes: Option<String>,
     pub contract_id: Option<String>,
     pub contract_number: Option<String>,
+    /// Rent on the active contract (the contract may cover several units).
+    pub rent_amount: Option<f64>,
     pub tenant_id: Option<String>,
     pub tenant_name: Option<String>,
     pub start_date: Option<String>,

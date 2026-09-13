@@ -12,7 +12,7 @@ import { SearchBox } from "@/components/SearchBox";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-state";
 import { BAND_LABEL } from "@/lib/bands";
-import { BAND_ORDER, CONTRACT_STATUS_LABEL, formatDate, keys } from "@/lib/format";
+import { BAND_ORDER, CONTRACT_STATUS_LABEL, formatDate, keys, formatMoney } from "@/lib/format";
 import { useListParams } from "@/lib/list-params";
 import { useBuildingOptions } from "@/lib/queries";
 import { ContractDialog } from "./ContractDialog";
@@ -47,6 +47,7 @@ export function ContractsPage() {
     { key: "building", header: "Building", sort: "building_name", render: (c) => c.buildingName },
     { key: "units", header: "Units", render: (c) => c.unitNumbers },
     { key: "people", header: "No. of tenants", className: "text-right tabular-nums", card: "metric", render: (c) => c.occupantCount },
+    { key: "rent", header: "Rent", className: "text-right tabular-nums", card: "metric", render: (c) => (c.rentAmount === null ? "—" : formatMoney(c.rentAmount)) },
     { key: "start", header: "Start", sort: "start_date", render: (c) => formatDate(c.startDate) },
     { key: "end", header: "End", sort: "end_date", card: "metric", render: (c) => formatDate(c.endDate) },
     { key: "remaining", header: "Remaining", sort: "remaining_days", card: "metric", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },

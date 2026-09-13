@@ -99,6 +99,10 @@ fn contract_input(i: &ContractInput) -> Result<renewal_db::contracts::ContractIn
         start_date: dto::date(&i.start_date, "start date")?,
         end_date: dto::date(&i.end_date, "end date")?,
         rent_terms: i.rent_terms.clone(),
+        rent_amount_minor: i
+            .rent_amount
+            .map(|a| dto::minor(a, "rent amount"))
+            .transpose()?,
         assigned_employee_id: dto::uuid_opt(&i.assigned_employee_id, "assigned employee")?,
         notes: i.notes.clone(),
     })

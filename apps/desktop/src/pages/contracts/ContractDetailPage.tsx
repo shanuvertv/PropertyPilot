@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { useEmployees } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { ContractDialog } from "./ContractDialog";
@@ -154,7 +154,11 @@ export function ContractDetailPage() {
               <div>{c.assignedEmployeeName ?? "—"}</div>
             </div>
             <div>
-              <div className="text-[12px] text-muted-foreground">Rental terms</div>
+              <div className="text-[12px] text-muted-foreground">Rent amount</div>
+              <div className="tabular-nums">{c.rentAmount === null ? "—" : formatMoney(c.rentAmount)}</div>
+            </div>
+            <div>
+              <div className="text-[12px] text-muted-foreground">Payment terms</div>
               <div>{c.rentTerms ?? "—"}</div>
             </div>
             <div>
@@ -225,7 +229,7 @@ export function ContractDetailPage() {
                 <div className="min-w-0 flex-1">
                   {x.id === c.id ? <span className="font-medium">{x.contractNumber}</span> : <Link to={`/contracts/${x.id}`} className="font-medium hover:underline">{x.contractNumber}</Link>}
                   <div className="text-[12.5px] text-muted-foreground">
-                    {formatDate(x.startDate)} → {formatDate(x.endDate)} · {x.durationMonths} months{x.rentTerms ? ` · ${x.rentTerms}` : ""}
+                    {formatDate(x.startDate)} → {formatDate(x.endDate)} · {x.durationMonths} months{x.rentAmount !== null ? ` · ${formatMoney(x.rentAmount)}` : ""}{x.rentTerms ? ` · ${x.rentTerms}` : ""}
                   </div>
                 </div>
                 <ContractStatusBadge status={x.status} />

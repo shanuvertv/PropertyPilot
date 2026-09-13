@@ -10,7 +10,8 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 ## What it does
 
 - Buildings, units and tenants with documents; unit-wise summary with expiry colours
-- Contracts (multi-unit) with automatic expiry bands (0–30 / 31–60 / 61–90 / 91–120 / beyond)
+- Contracts (multi-unit) with rent amount, payment terms, number of tenants per unit and
+  automatic expiry bands (0–30 / 31–60 / 61–90 / 91–120 / beyond)
 - Renewal cases: 11-status workflow, tenant responses, follow-ups, checklist, completion that
   creates the linked renewal contract and keeps the timeline
 - Renewal notices: auto-drafted letter → PDF (letterhead) → email with attachment, tracked
@@ -19,7 +20,9 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
   each; notification centre with live updates and native toasts
 - Reports (5) with Excel/PDF export; full audit trail with per-record history
 - Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Management view expenses)
-- Excel import of an existing tenant list (preview, then commit; safe to re-run)
+- Excel import of an existing tenant list — its own **Import data** page: buildings, units,
+  tenants, contracts with dates, number of tenants (capacity) and rent per annum (preview,
+  then commit; re-running fills in rent / tenants on contracts imported earlier, never duplicates)
 - Android app: the same screens with bottom tabs and card lists; token kept in the app's
   private storage; works over the LAN or the internet (HTTPS)
 - Browser version: the server serves the same UI at `https://<server>/` (set `WEB_DIR` or put

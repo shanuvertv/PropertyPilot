@@ -32,6 +32,8 @@ pub struct Contract {
     pub end_date: String,
     pub duration_months: i32,
     pub rent_terms: Option<String>,
+    /// Rent for the contract (major units, e.g. 120000.00); optional.
+    pub rent_amount: Option<f64>,
     pub status: ContractStatus,
     pub assigned_employee_id: Option<String>,
     pub assigned_employee_name: Option<String>,
@@ -79,6 +81,8 @@ pub struct ContractInput {
     pub start_date: String,
     pub end_date: String,
     pub rent_terms: Option<String>,
+    #[serde(default)]
+    pub rent_amount: Option<f64>,
     pub assigned_employee_id: Option<String>,
     pub notes: Option<String>,
     /// Create straight into Active (default) or leave as Draft.
@@ -282,6 +286,9 @@ pub struct CompleteRenewalRequest {
     pub start_date: String,
     pub end_date: String,
     pub rent_terms: Option<String>,
+    /// New rent; omitted = the old contract's amount.
+    #[serde(default)]
+    pub rent_amount: Option<f64>,
     pub notes: Option<String>,
 }
 

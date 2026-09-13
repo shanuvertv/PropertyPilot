@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-state";
 import { BAND_LABEL } from "@/lib/bands";
-import { BAND_ORDER, RENEWAL_STATUS_LABEL, UNIT_STATUS_LABEL, formatDate, keys } from "@/lib/format";
+import { BAND_ORDER, RENEWAL_STATUS_LABEL, UNIT_STATUS_LABEL, formatDate, keys, formatMoney } from "@/lib/format";
 import { useListParams } from "@/lib/list-params";
 import { useBuildingOptions } from "@/lib/queries";
 import { UnitDialog } from "./UnitDialog";
@@ -58,6 +58,7 @@ export function UnitsPage() {
     { key: "unit", header: "Unit", sort: "unit_number", card: "title", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
     { key: "type", header: "Type", sort: "unit_type", render: (u) => u.unitType ?? "—" },
     { key: "people", header: "No. of tenants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
+    { key: "rent", header: "Rent", className: "text-right tabular-nums", card: "metric", render: (u) => (u.rentAmount === null ? "—" : formatMoney(u.rentAmount)) },
     { key: "tenant", header: "Tenant", sort: "tenant_name", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : <span className="text-muted-foreground">—</span>) },
     { key: "start", header: "Start", sort: "start_date", render: (u) => formatDate(u.startDate) },
     { key: "end", header: "End", sort: "end_date", card: "metric", render: (u) => formatDate(u.endDate) },

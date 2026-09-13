@@ -26,6 +26,8 @@ pub struct UnitSummaryRow {
     pub contract_number: Option<String>,
     pub start_date: Option<NaiveDate>,
     pub end_date: Option<NaiveDate>,
+    /// Rent on the active contract (minor units); the contract may cover several units.
+    pub rent_amount_minor: Option<i64>,
     pub tenant_id: Option<Uuid>,
     pub tenant_name: Option<String>,
     pub remaining_days: Option<i32>,
@@ -61,7 +63,7 @@ pub struct UnitFilter {
 
 const SELECT: &str = "SELECT u.id, u.building_id, b.name AS building_name, b.code AS building_code, u.unit_number, u.floor,
        u.unit_type, u.status, COALESCE(c.unit_occupants, 0) AS occupant_count, u.notes, u.created_at, u.updated_at,
-       c.id AS contract_id, c.contract_number, c.start_date, c.end_date,
+       c.id AS contract_id, c.contract_number, c.start_date, c.end_date, c.rent_amount_minor,
        t.id AS tenant_id, t.name AS tenant_name,
        e.remaining_days, e.band, e.expiring_soon, e.urgent,
        rc.id AS case_id, rc.status AS renewal_status,

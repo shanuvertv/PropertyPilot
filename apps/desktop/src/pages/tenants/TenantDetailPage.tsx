@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
 import { useLocalFilter } from "@/lib/local-filter";
 import { SearchBox } from "@/components/SearchBox";
-import { TENANT_RESPONSE_LABEL, formatDate, formatDateTime } from "@/lib/format";
+import { TENANT_RESPONSE_LABEL, formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { TenantDialog } from "./TenantDialog";
 import { TenantEmails } from "./TenantEmails";
 
@@ -50,6 +50,7 @@ export function TenantDetailPage() {
     { key: "units", header: "Units", render: (c) => c.unitNumbers },
     { key: "start", header: "Start", render: (c) => formatDate(c.startDate) },
     { key: "end", header: "End", card: "metric", render: (c) => formatDate(c.endDate) },
+    { key: "rent", header: "Rent", className: "text-right tabular-nums", card: "metric", render: (c) => (c.rentAmount === null ? "—" : formatMoney(c.rentAmount)) },
     { key: "remaining", header: "Remaining", card: "metric", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },
     { key: "status", header: "Status", card: "badge", render: (c) => <ContractStatusBadge status={c.status} /> },
     { key: "renewal", header: "Renewal", card: "badge", render: (c) => <RenewalStatusBadge status={c.renewalStatus} /> },

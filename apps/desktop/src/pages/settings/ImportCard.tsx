@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApp } from "@/lib/app-state";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 
 type Stage =
   | { kind: "idle" }
@@ -163,6 +163,8 @@ export function ImportCard() {
                     <TableHead>Units</TableHead>
                     <TableHead>Start</TableHead>
                     <TableHead>End</TableHead>
+                    <TableHead className="text-right">Tenants</TableHead>
+                    <TableHead className="text-right">Rent / annum</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Notes</TableHead>
                   </TableRow>
@@ -178,6 +180,8 @@ export function ImportCard() {
                       </TableCell>
                       <TableCell className="tabular-nums whitespace-nowrap">{formatDate(c.start)}</TableCell>
                       <TableCell className="tabular-nums whitespace-nowrap">{formatDate(c.end)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.tenants}</TableCell>
+                      <TableCell className="text-right tabular-nums whitespace-nowrap">{c.rentAmount === null ? "—" : formatMoney(c.rentAmount)}</TableCell>
                       <TableCell>
                         <Badge variant={c.skip ? "outline" : c.status === "EXPIRED" ? "destructive" : "secondary"}>
                           {c.skip ? "Already imported" : c.status === "EXPIRED" ? "Expired" : "Active"}
@@ -188,7 +192,7 @@ export function ImportCard() {
                   ))}
                   {preview.contracts.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
                         No contracts found in this workbook.
                       </TableCell>
                     </TableRow>

@@ -45,6 +45,10 @@ pub struct PlannedContract {
     pub end: NaiveDate,
     pub status: String,
     pub rent_terms: Option<String>,
+    /// Total rent per annum from the sheet, if given.
+    pub rent_amount: Option<f64>,
+    /// Number of tenants (the sheet's capacity) across the contract's units.
+    pub tenants: i64,
     pub warnings: Vec<String>,
     pub skip: bool,
 }
@@ -319,6 +323,17 @@ fn group(rows: &[ParsedRow]) -> Vec<Group> {
     groups
 }
 
+/// Sum of the sheet's "Total Rent/Annum" over the group's rows (None when absent).
+fn rent_amount(g: &Group) -> Option<f64> {
+    let total: f64 = g.rows.iter().filter_map(|r| r.total_per_annum).sum();
+    (total > 0.0).then_some(total)
+}
+
+/// Number of tenants per unit from the sheet's capacity column.
+fn tenants(g: &Group) -> i64 {
+    g.rows.iter().filter_map(|r| r.capacity).sum()
+}
+
 fn rent_terms(g: &Group) -> Option<String> {
     let total: f64 = g.rows.iter().filter_map(|r| r.total_per_annum).sum();
     let beds: i64 = g.rows.iter().filter_map(|r| r.capacity).sum();
@@ -352,14 +367,28 @@ async fn contract_exists<'e>(
     start: NaiveDate,
     end: NaiveDate,
 ) -> ServiceResult<bool> {
+    Ok(existing_contract(ex, tenant_id, building_id, start, end)
+        .await?
+        .is_some())
+}
+
+/// The already-imported contract with the same tenant, building and dates, if any.
+async fn existing_contract<'e>(
+    ex: impl renewal_db::sqlx::PgExecutor<'e>,
+    tenant_id: uuid::Uuid,
+    building_id: uuid::Uuid,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> ServiceResult<Option<uuid::Uuid>> {
     Ok(renewal_db::sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM contracts WHERE tenant_id = $1 AND building_id = $2 AND start_date = $3 AND end_date = $4)",
+        "SELECT id FROM contracts WHERE tenant_id = $1 AND building_id = $2 AND start_date = $3 AND end_date = $4
+          ORDER BY created_at LIMIT 1",
     )
     .bind(tenant_id)
     .bind(building_id)
     .bind(start)
     .bind(end)
-    .fetch_one(ex)
+    .fetch_optional(ex)
     .await?)
 }
 
@@ -476,6 +505,8 @@ pub async fn preview(
             end: g.end,
             status: status.to_string(),
             rent_terms: rent_terms(&g),
+            rent_amount: rent_amount(&g),
+            tenants: tenants(&g),
             warnings: if skip {
                 vec!["identical contract already exists".into()]
             } else {
@@ -648,13 +679,67 @@ pub async fn commit(pool: &PgPool, caller: &Session, bytes: &[u8]) -> ServiceRes
             .collect();
         ids.sort();
         ids.dedup();
-        // Identical contract already there? (same tenant, building, dates)
-        if contract_exists(&mut *tx, tenant_id, building_id, g.start, g.end).await? {
+        // Identical contract already there? (same tenant, building, dates) — keep it, but
+        // fill in the rent and the number of tenants if the earlier import lacked them.
+        if let Some(existing) =
+            existing_contract(&mut *tx, tenant_id, building_id, g.start, g.end).await?
+        {
+            let row = contracts::find(&mut *tx, existing).await?;
+            let mut filled = Vec::new();
+            if let Some(row) = row {
+                let rent = rent_amount(&g).map(|a| (a * 100.0).round() as i64);
+                let rent_missing = row.rent_amount_minor.is_none() && rent.is_some();
+                let tenants_missing = row.occupant_count == 0 && tenants(&g) > 0;
+                if rent_missing || tenants_missing {
+                    let unit_tenants: Vec<(uuid::Uuid, i32)> = if tenants_missing {
+                        g.rows
+                            .iter()
+                            .filter_map(|r| {
+                                let id = unit_ids
+                                    .get(&(
+                                        norm(&g.building),
+                                        norm(&unit_number(&g.building, &r.unit)),
+                                    ))
+                                    .copied()?;
+                                let n = i32::try_from(r.capacity.unwrap_or(0).clamp(0, 500))
+                                    .unwrap_or(0);
+                                row.unit_ids.contains(&id).then_some((id, n))
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
+                    contracts::set_rent_and_tenants(
+                        &mut tx,
+                        existing,
+                        if rent_missing { rent } else { None },
+                        &unit_tenants,
+                    )
+                    .await?;
+                    if rent_missing {
+                        filled.push("rent");
+                    }
+                    if tenants_missing {
+                        filled.push("number of tenants");
+                    }
+                }
+            }
             result.contracts_skipped += 1;
-            warnings.push(format!(
-                "{} @ {} {}–{}: already exists, skipped",
-                g.tenant, g.building, g.start, g.end
-            ));
+            warnings.push(if filled.is_empty() {
+                format!(
+                    "{} @ {} {}–{}: already exists, skipped",
+                    g.tenant, g.building, g.start, g.end
+                )
+            } else {
+                format!(
+                    "{} @ {} {}–{}: already exists; filled in {}",
+                    g.tenant,
+                    g.building,
+                    g.start,
+                    g.end,
+                    filled.join(" and ")
+                )
+            });
             continue;
         }
         let active = g.end >= today;
@@ -694,15 +779,28 @@ pub async fn commit(pool: &PgPool, caller: &Session, bytes: &[u8]) -> ServiceRes
             })
             .collect::<Vec<_>>()
             .join("\n");
+        // Capacity on the sheet = number of tenants in that unit.
+        let unit_tenants: Vec<(uuid::Uuid, i32)> = g
+            .rows
+            .iter()
+            .filter_map(|r| {
+                let id = unit_ids
+                    .get(&(norm(&g.building), norm(&unit_number(&g.building, &r.unit))))
+                    .copied()?;
+                let n = i32::try_from(r.capacity.unwrap_or(0).clamp(0, 500)).unwrap_or(0);
+                ids.contains(&id).then_some((id, n))
+            })
+            .collect();
         let input = ContractInput {
             contract_number: number,
             tenant_id,
             building_id,
             unit_ids: ids.clone(),
-            unit_tenants: Vec::new(),
+            unit_tenants,
             start_date: g.start,
             end_date: g.end,
             rent_terms: rent_terms(&g),
+            rent_amount_minor: rent_amount(&g).map(|a| (a * 100.0).round() as i64),
             assigned_employee_id: None,
             notes: Some(format!("Imported from Excel\n{notes}")),
         };

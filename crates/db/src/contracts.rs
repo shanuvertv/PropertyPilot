@@ -20,6 +20,8 @@ pub struct ContractRow {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
+    /// Rent for the contract in minor units (fils); optional.
+    pub rent_amount_minor: Option<i64>,
     pub status: String,
     pub assigned_employee_id: Option<Uuid>,
     pub assigned_employee_name: Option<String>,
@@ -60,6 +62,7 @@ pub struct ContractInput {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
+    pub rent_amount_minor: Option<i64>,
     pub assigned_employee_id: Option<Uuid>,
     pub notes: Option<String>,
 }
@@ -84,7 +87,7 @@ pub struct ContractFilter {
 
 pub const SELECT: &str = "SELECT c.id, c.contract_number, c.tenant_id, t.name AS tenant_name, t.contact_person AS tenant_contact, t.email AS tenant_email,
        c.building_id, b.name AS building_name, b.code AS building_code,
-       c.start_date, c.end_date, c.rent_terms, c.status, c.assigned_employee_id, emp.name AS assigned_employee_name,
+       c.start_date, c.end_date, c.rent_terms, c.rent_amount_minor, c.status, c.assigned_employee_id, emp.name AS assigned_employee_name,
        c.previous_contract_id, c.root_contract_id, c.renewal_sequence, c.notes, c.activated_at, c.ended_at,
        c.created_at, c.updated_at,
        e.remaining_days, e.band, e.expiring_soon, e.urgent, e.renewal_in_progress,
@@ -270,8 +273,8 @@ pub async fn insert(conn: &mut PgConnection, c: &InsertContract<'_>) -> DbResult
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO contracts (contract_number, tenant_id, building_id, start_date, end_date, rent_terms, status,
                                 assigned_employee_id, previous_contract_id, root_contract_id, renewal_sequence, notes,
-                                activated_at, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $7 = 'ACTIVE' THEN now() END, $13)
+                                activated_at, created_by, rent_amount_minor)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $7 = 'ACTIVE' THEN now() END, $13, $14)
          RETURNING id",
     )
     .bind(&c.input.contract_number)
@@ -287,6 +290,7 @@ pub async fn insert(conn: &mut PgConnection, c: &InsertContract<'_>) -> DbResult
     .bind(c.renewal_sequence)
     .bind(&c.input.notes)
     .bind(c.created_by)
+    .bind(c.input.rent_amount_minor)
     .fetch_one(&mut *conn)
     .await?;
     set_units(conn, id, &c.input.unit_ids, &c.input.unit_tenants).await?;
@@ -331,7 +335,7 @@ pub async fn set_units(
 pub async fn update(conn: &mut PgConnection, id: Uuid, input: &ContractInput) -> DbResult<()> {
     sqlx::query(
         "UPDATE contracts SET contract_number = $2, tenant_id = $3, building_id = $4, start_date = $5, end_date = $6,
-                rent_terms = $7, assigned_employee_id = $8, notes = $9, updated_at = now() WHERE id = $1",
+                rent_terms = $7, assigned_employee_id = $8, notes = $9, rent_amount_minor = $10, updated_at = now() WHERE id = $1",
     )
     .bind(id)
     .bind(&input.contract_number)
@@ -342,9 +346,40 @@ pub async fn update(conn: &mut PgConnection, id: Uuid, input: &ContractInput) ->
     .bind(&input.rent_terms)
     .bind(input.assigned_employee_id)
     .bind(&input.notes)
+    .bind(input.rent_amount_minor)
     .execute(&mut *conn)
     .await?;
     set_units(conn, id, &input.unit_ids, &input.unit_tenants).await
+}
+
+/// Fills in the rent and the number of tenants per unit on an existing contract without
+/// touching anything else (used when a tenant list is imported again with those columns).
+pub async fn set_rent_and_tenants(
+    conn: &mut PgConnection,
+    id: Uuid,
+    rent_amount_minor: Option<i64>,
+    unit_tenants: &[(Uuid, i32)],
+) -> DbResult<()> {
+    if let Some(rent) = rent_amount_minor {
+        sqlx::query(
+            "UPDATE contracts SET rent_amount_minor = $2, updated_at = now() WHERE id = $1",
+        )
+        .bind(id)
+        .bind(rent)
+        .execute(&mut *conn)
+        .await?;
+    }
+    for (unit_id, n) in unit_tenants {
+        sqlx::query(
+            "UPDATE contract_units SET occupant_count = $3 WHERE contract_id = $1 AND unit_id = $2",
+        )
+        .bind(id)
+        .bind(unit_id)
+        .bind(n)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
 }
 
 pub async fn set_status<'e>(ex: impl PgExecutor<'e>, id: Uuid, status: &str) -> DbResult<()> {

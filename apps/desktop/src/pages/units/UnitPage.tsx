@@ -62,7 +62,7 @@ export function UnitPage() {
       />
 
       <Card className="mb-4">
-        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 text-[13.5px] md:grid-cols-3 xl:grid-cols-5">
+        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 text-[13.5px] md:grid-cols-3 xl:grid-cols-6">
           <div>
             <div className="text-[12px] text-muted-foreground">Tenant</div>
             <div>{u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="text-primary hover:underline">{u.tenantName}</Link> : "Vacant"}</div>
@@ -82,6 +82,10 @@ export function UnitPage() {
           <div>
             <div className="text-[12px] text-muted-foreground">Number of tenants</div>
             <TenantCount unit={u} />
+          </div>
+          <div>
+            <div className="text-[12px] text-muted-foreground">Rent (contract)</div>
+            <div className="tabular-nums">{u.rentAmount === null ? "—" : formatMoney(u.rentAmount)}</div>
           </div>
         </CardContent>
       </Card>

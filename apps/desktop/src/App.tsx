@@ -25,6 +25,7 @@ import { UnitsPage } from "@/pages/units/UnitsPage";
 import { UnitPage } from "@/pages/units/UnitPage";
 import { ExpensesPage } from "@/pages/expenses/ExpensesPage";
 import { ExpenseDetailPage } from "@/pages/expenses/ExpenseDetailPage";
+import { ImportPage } from "@/pages/ImportPage";
 
 function Loading() {
   return (
@@ -92,6 +93,7 @@ export default function App() {
             <Route path="/emails" element={<Guarded path="/emails"><EmailsPage /></Guarded>} />
             <Route path="/notifications" element={<Guarded path="/notifications"><NotificationsPage /></Guarded>} />
             <Route path="/reports" element={<Guarded path="/reports"><ReportsPage /></Guarded>} />
+            <Route path="/import" element={<Guarded path="/import"><ImportPage /></Guarded>} />
             <Route path="/settings" element={<Guarded path="/settings"><SettingsPage /></Guarded>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

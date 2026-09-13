@@ -109,6 +109,8 @@ export interface UnitSummary {
   notes: string | null;
   contractId: string | null;
   contractNumber: string | null;
+  /** Rent on the active contract (the contract may cover several units). */
+  rentAmount: number | null;
   tenantId: string | null;
   tenantName: string | null;
   startDate: string | null;
@@ -212,6 +214,8 @@ export interface Contract {
   endDate: string;
   durationMonths: number;
   rentTerms: string | null;
+  /** Rent for the contract (AED); optional. */
+  rentAmount: number | null;
   status: ContractStatus;
   assignedEmployeeId: string | null;
   assignedEmployeeName: string | null;
@@ -251,6 +255,7 @@ export interface ContractInput {
   startDate: string;
   endDate: string;
   rentTerms: string | null;
+  rentAmount?: number | null;
   assignedEmployeeId: string | null;
   notes: string | null;
   activate?: boolean;
@@ -366,6 +371,8 @@ export interface CompleteRenewalRequest {
   startDate: string;
   endDate: string;
   rentTerms: string | null;
+  /** New rent; null keeps the old contract's amount. */
+  rentAmount?: number | null;
   notes: string | null;
 }
 
@@ -758,6 +765,8 @@ export interface PlannedContract {
   end: string;
   status: string;
   rentTerms: string | null;
+  rentAmount: number | null;
+  tenants: number;
   warnings: string[];
   skip: boolean;
 }

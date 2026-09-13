@@ -348,6 +348,8 @@ pub struct CompletionInput {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
+    /// New rent; `None` keeps the old contract's amount.
+    pub rent_amount_minor: Option<i64>,
     pub notes: Option<String>,
 }
 
@@ -434,6 +436,7 @@ pub async fn complete(
         start_date: input.start_date,
         end_date: input.end_date,
         rent_terms: input.rent_terms.or(old.rent_terms.clone()),
+        rent_amount_minor: input.rent_amount_minor.or(old.rent_amount_minor),
         assigned_employee_id: case.assigned_employee_id.or(old.assigned_employee_id),
         notes: input.notes,
     };

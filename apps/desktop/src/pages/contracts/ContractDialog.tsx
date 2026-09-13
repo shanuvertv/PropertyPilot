@@ -37,6 +37,7 @@ export function ContractDialog({
     startDate: todayIso(),
     endDate: addDaysIso(todayIso(), 364),
     rentTerms: "",
+    rentAmount: "",
     assignedEmployeeId: "",
     notes: "",
     activate: true,
@@ -54,6 +55,7 @@ export function ContractDialog({
         startDate: contract.startDate,
         endDate: contract.endDate,
         rentTerms: str(contract.rentTerms),
+        rentAmount: contract.rentAmount === null ? "" : contract.rentAmount.toFixed(2),
         assignedEmployeeId: str(contract.assignedEmployeeId),
         notes: str(contract.notes),
         activate: contract.status === "ACTIVE",
@@ -69,6 +71,7 @@ export function ContractDialog({
         startDate: todayIso(),
         endDate: addDaysIso(todayIso(), 364),
         rentTerms: "",
+        rentAmount: "",
         assignedEmployeeId: "",
         notes: "",
         activate: true,
@@ -99,12 +102,15 @@ export function ContractDialog({
       if (!Number.isInteger(n) || n < 0 || n > 500) throw new Error("The number of tenants must be a whole number between 0 and 500.");
       return { unitId: id, occupantCount: n };
     });
+    const rentAmount = form.rentAmount.trim() ? Number(form.rentAmount) : null;
+    if (rentAmount !== null && (!Number.isFinite(rentAmount) || rentAmount < 0)) throw new Error("Enter the rent amount as a number of AED (0 or more).");
     const input: ContractInput = {
       contractNumber: form.contractNumber,
       tenantId: form.tenantId,
       buildingId: form.buildingId,
       unitIds: form.unitIds,
       unitTenants,
+      rentAmount: rentAmount === null ? null : Math.round(rentAmount * 100) / 100,
       startDate: form.startDate,
       endDate: form.endDate,
       rentTerms: opt(form.rentTerms),
@@ -196,7 +202,8 @@ export function ContractDialog({
         )}
         <TextField id="c-start" label="Start date" type="date" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} required />
         <TextField id="c-end" label="End date" type="date" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} required />
-        <TextField id="c-rent" label="Rental terms / rent amount (optional)" value={form.rentTerms} onChange={(v) => setForm({ ...form, rentTerms: v })} placeholder="e.g. AED 120,000 per year, 4 cheques" className="sm:col-span-2" hint="Display only — this system does not do accounting." />
+        <TextField id="c-rent-amount" label="Rent amount (AED)" type="number" value={form.rentAmount} onChange={(v) => setForm({ ...form, rentAmount: v })} placeholder="e.g. 120000" hint="Rent for the contract period. Display only — this system does not do accounting." />
+        <TextField id="c-rent" label="Payment terms (optional)" value={form.rentTerms} onChange={(v) => setForm({ ...form, rentTerms: v })} placeholder="e.g. 4 cheques, AED 800 per bed per month" />
         <TextAreaField id="c-notes" label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} className="sm:col-span-2" />
         {!contract && (
           <label className="flex items-center gap-2 text-[13.5px] sm:col-span-2">
