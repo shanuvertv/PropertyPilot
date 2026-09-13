@@ -20,7 +20,7 @@ pub struct ContractRow {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
-    /// Rent for the contract in minor units (fils); optional.
+    /// Rent for the whole contract (sum of the units' rents, minor units); None when unknown.
     pub rent_amount_minor: Option<i64>,
     pub status: String,
     pub assigned_employee_id: Option<Uuid>,
@@ -47,8 +47,20 @@ pub struct ContractRow {
     pub unit_numbers: String,
     /// Number of tenants per unit, in the same order as `unit_ids`.
     pub unit_occupant_counts: Vec<i32>,
+    /// Rent per unit (minor units), in the same order as `unit_ids`; None where not recorded.
+    pub unit_rent_amounts: Vec<Option<i64>>,
     /// Number of tenants on the whole contract.
     pub occupant_count: i64,
+}
+
+/// What the contract says about one of its units.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnitTerms {
+    pub unit_id: Uuid,
+    /// People living in the unit (what its bills are split by).
+    pub occupant_count: i32,
+    /// Rent for this unit under the contract, minor units.
+    pub rent_amount_minor: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -57,12 +69,11 @@ pub struct ContractInput {
     pub tenant_id: Uuid,
     pub building_id: Uuid,
     pub unit_ids: Vec<Uuid>,
-    /// Number of tenants per unit (`unit_id`, count); units not listed get 0.
-    pub unit_tenants: Vec<(Uuid, i32)>,
+    /// Tenants and rent per unit; units not listed get 0 tenants and no rent.
+    pub unit_terms: Vec<UnitTerms>,
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
-    pub rent_amount_minor: Option<i64>,
     pub assigned_employee_id: Option<Uuid>,
     pub notes: Option<String>,
 }
@@ -87,7 +98,7 @@ pub struct ContractFilter {
 
 pub const SELECT: &str = "SELECT c.id, c.contract_number, c.tenant_id, t.name AS tenant_name, t.contact_person AS tenant_contact, t.email AS tenant_email,
        c.building_id, b.name AS building_name, b.code AS building_code,
-       c.start_date, c.end_date, c.rent_terms, c.rent_amount_minor, c.status, c.assigned_employee_id, emp.name AS assigned_employee_name,
+       c.start_date, c.end_date, c.rent_terms, c.status, c.assigned_employee_id, emp.name AS assigned_employee_name,
        c.previous_contract_id, c.root_contract_id, c.renewal_sequence, c.notes, c.activated_at, c.ended_at,
        c.created_at, c.updated_at,
        e.remaining_days, e.band, e.expiring_soon, e.urgent, e.renewal_in_progress,
@@ -99,6 +110,9 @@ pub const SELECT: &str = "SELECT c.id, c.contract_number, c.tenant_id, t.name AS
           FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_numbers,
        (SELECT COALESCE(array_agg(cu.occupant_count ORDER BY u.unit_number), ARRAY[]::int[])
           FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_occupant_counts,
+       (SELECT COALESCE(array_agg(cu.rent_amount_minor ORDER BY u.unit_number), ARRAY[]::bigint[])
+          FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_rent_amounts,
+       (SELECT sum(cu.rent_amount_minor)::bigint FROM contract_units cu WHERE cu.contract_id = c.id) AS rent_amount_minor,
        (SELECT COALESCE(sum(cu.occupant_count), 0)::bigint FROM contract_units cu WHERE cu.contract_id = c.id) AS occupant_count
   FROM contracts c
   JOIN tenants t ON t.id = c.tenant_id
@@ -273,8 +287,8 @@ pub async fn insert(conn: &mut PgConnection, c: &InsertContract<'_>) -> DbResult
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO contracts (contract_number, tenant_id, building_id, start_date, end_date, rent_terms, status,
                                 assigned_employee_id, previous_contract_id, root_contract_id, renewal_sequence, notes,
-                                activated_at, created_by, rent_amount_minor)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $7 = 'ACTIVE' THEN now() END, $13, $14)
+                                activated_at, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $7 = 'ACTIVE' THEN now() END, $13)
          RETURNING id",
     )
     .bind(&c.input.contract_number)
@@ -290,42 +304,45 @@ pub async fn insert(conn: &mut PgConnection, c: &InsertContract<'_>) -> DbResult
     .bind(c.renewal_sequence)
     .bind(&c.input.notes)
     .bind(c.created_by)
-    .bind(c.input.rent_amount_minor)
     .fetch_one(&mut *conn)
     .await?;
-    set_units(conn, id, &c.input.unit_ids, &c.input.unit_tenants).await?;
+    set_units(conn, id, &c.input.unit_ids, &c.input.unit_terms).await?;
     Ok(id)
 }
 
-/// Replaces the contract's units; each carries its number of tenants (0 unless listed).
+/// Replaces the contract's units; each carries its number of tenants and rent (0 / none
+/// unless listed in `unit_terms`).
 pub async fn set_units(
     conn: &mut PgConnection,
     contract_id: Uuid,
     unit_ids: &[Uuid],
-    unit_tenants: &[(Uuid, i32)],
+    unit_terms: &[UnitTerms],
 ) -> DbResult<()> {
     sqlx::query("DELETE FROM contract_units WHERE contract_id = $1")
         .bind(contract_id)
         .execute(&mut *conn)
         .await?;
     if !unit_ids.is_empty() {
-        let counts: Vec<i32> = unit_ids
+        let terms: Vec<Option<&UnitTerms>> = unit_ids
             .iter()
-            .map(|u| {
-                unit_tenants
-                    .iter()
-                    .find(|(id, _)| id == u)
-                    .map(|(_, n)| *n)
-                    .unwrap_or(0)
-            })
+            .map(|u| unit_terms.iter().find(|t| t.unit_id == *u))
+            .collect();
+        let counts: Vec<i32> = terms
+            .iter()
+            .map(|t| t.map(|t| t.occupant_count).unwrap_or(0))
+            .collect();
+        let rents: Vec<Option<i64>> = terms
+            .iter()
+            .map(|t| t.and_then(|t| t.rent_amount_minor))
             .collect();
         sqlx::query(
-            "INSERT INTO contract_units (contract_id, unit_id, occupant_count)
-             SELECT $1, unnest($2::uuid[]), unnest($3::int[])",
+            "INSERT INTO contract_units (contract_id, unit_id, occupant_count, rent_amount_minor)
+             SELECT $1, unnest($2::uuid[]), unnest($3::int[]), unnest($4::bigint[])",
         )
         .bind(contract_id)
         .bind(unit_ids)
         .bind(&counts)
+        .bind(&rents)
         .execute(&mut *conn)
         .await?;
     }
@@ -335,7 +352,7 @@ pub async fn set_units(
 pub async fn update(conn: &mut PgConnection, id: Uuid, input: &ContractInput) -> DbResult<()> {
     sqlx::query(
         "UPDATE contracts SET contract_number = $2, tenant_id = $3, building_id = $4, start_date = $5, end_date = $6,
-                rent_terms = $7, assigned_employee_id = $8, notes = $9, rent_amount_minor = $10, updated_at = now() WHERE id = $1",
+                rent_terms = $7, assigned_employee_id = $8, notes = $9, updated_at = now() WHERE id = $1",
     )
     .bind(id)
     .bind(&input.contract_number)
@@ -346,36 +363,30 @@ pub async fn update(conn: &mut PgConnection, id: Uuid, input: &ContractInput) ->
     .bind(&input.rent_terms)
     .bind(input.assigned_employee_id)
     .bind(&input.notes)
-    .bind(input.rent_amount_minor)
     .execute(&mut *conn)
     .await?;
-    set_units(conn, id, &input.unit_ids, &input.unit_tenants).await
+    set_units(conn, id, &input.unit_ids, &input.unit_terms).await
 }
 
-/// Fills in the rent and the number of tenants per unit on an existing contract without
-/// touching anything else (used when a tenant list is imported again with those columns).
-pub async fn set_rent_and_tenants(
+/// Fills in missing per-unit terms on an existing contract without touching anything
+/// else (used when a tenant list is imported again with those columns): a unit's rent is
+/// set only where none is recorded, its tenants only where the count is still 0.
+pub async fn fill_unit_terms(
     conn: &mut PgConnection,
     id: Uuid,
-    rent_amount_minor: Option<i64>,
-    unit_tenants: &[(Uuid, i32)],
+    unit_terms: &[UnitTerms],
 ) -> DbResult<()> {
-    if let Some(rent) = rent_amount_minor {
+    for t in unit_terms {
         sqlx::query(
-            "UPDATE contracts SET rent_amount_minor = $2, updated_at = now() WHERE id = $1",
+            "UPDATE contract_units
+                SET occupant_count = CASE WHEN occupant_count = 0 THEN $3 ELSE occupant_count END,
+                    rent_amount_minor = COALESCE(rent_amount_minor, $4)
+              WHERE contract_id = $1 AND unit_id = $2",
         )
         .bind(id)
-        .bind(rent)
-        .execute(&mut *conn)
-        .await?;
-    }
-    for (unit_id, n) in unit_tenants {
-        sqlx::query(
-            "UPDATE contract_units SET occupant_count = $3 WHERE contract_id = $1 AND unit_id = $2",
-        )
-        .bind(id)
-        .bind(unit_id)
-        .bind(n)
+        .bind(t.unit_id)
+        .bind(t.occupant_count)
+        .bind(t.rent_amount_minor)
         .execute(&mut *conn)
         .await?;
     }

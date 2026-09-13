@@ -2,7 +2,7 @@
 
 use chrono::NaiveDate;
 use renewal_core::{Capability, ContractStatus, RenewalStatus, TenantResponse, UnitStatus};
-use renewal_db::contracts::{self, ContractInput, ContractRow, InsertContract};
+use renewal_db::contracts::{self, ContractInput, ContractRow, InsertContract, UnitTerms};
 use renewal_db::paging::{ListQuery, PageResult};
 use renewal_db::renewals::{
     self, CaseFilter, CaseRow, ChecklistItemRow, ResponseRow, TemplateItemInput, TemplateItemRow,
@@ -348,8 +348,8 @@ pub struct CompletionInput {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
-    /// New rent; `None` keeps the old contract's amount.
-    pub rent_amount_minor: Option<i64>,
+    /// New tenants / rent per unit; `None` keeps the old contract's figures.
+    pub unit_terms: Option<Vec<UnitTerms>>,
     pub notes: Option<String>,
 }
 
@@ -426,17 +426,22 @@ pub async fn complete(
         tenant_id: old.tenant_id,
         building_id: old.building_id,
         unit_ids: old.unit_ids.clone(),
-        // The renewal keeps the same tenants per unit unless the leasing team changes it later.
-        unit_tenants: old
-            .unit_ids
-            .iter()
-            .copied()
-            .zip(old.unit_occupant_counts.iter().copied())
-            .collect(),
+        // The renewal keeps the old tenants and rent per unit unless new figures were given.
+        unit_terms: input.unit_terms.take().unwrap_or_else(|| {
+            old.unit_ids
+                .iter()
+                .zip(old.unit_occupant_counts.iter())
+                .zip(old.unit_rent_amounts.iter())
+                .map(|((u, n), r)| UnitTerms {
+                    unit_id: *u,
+                    occupant_count: *n,
+                    rent_amount_minor: *r,
+                })
+                .collect()
+        }),
         start_date: input.start_date,
         end_date: input.end_date,
         rent_terms: input.rent_terms.or(old.rent_terms.clone()),
-        rent_amount_minor: input.rent_amount_minor.or(old.rent_amount_minor),
         assigned_employee_id: case.assigned_employee_id.or(old.assigned_employee_id),
         notes: input.notes,
     };

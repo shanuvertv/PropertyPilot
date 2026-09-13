@@ -11,7 +11,7 @@ use calamine::{Data, Reader, Xlsx};
 use chrono::NaiveDate;
 use renewal_core::{Capability, ContractStatus, UnitStatus};
 use renewal_db::buildings::{self, BuildingInput};
-use renewal_db::contracts::{self, ContractInput, InsertContract};
+use renewal_db::contracts::{self, ContractInput, InsertContract, UnitTerms};
 use renewal_db::tenants::{self, TenantInput};
 use renewal_db::units::{self, UnitInput};
 use renewal_db::PgPool;
@@ -321,6 +321,25 @@ fn group(rows: &[ParsedRow]) -> Vec<Group> {
         }
     }
     groups
+}
+
+/// One sheet row's terms for its unit: capacity = number of tenants, total/annum = rent.
+fn row_terms(
+    building: &str,
+    r: &ParsedRow,
+    unit_ids: &BTreeMap<(String, String), uuid::Uuid>,
+) -> Option<UnitTerms> {
+    let id = unit_ids
+        .get(&(norm(building), norm(&unit_number(building, &r.unit))))
+        .copied()?;
+    Some(UnitTerms {
+        unit_id: id,
+        occupant_count: i32::try_from(r.capacity.unwrap_or(0).clamp(0, 500)).unwrap_or(0),
+        rent_amount_minor: r
+            .total_per_annum
+            .filter(|t| *t > 0.0)
+            .map(|t| (t * 100.0).round() as i64),
+    })
 }
 
 /// Sum of the sheet's "Total Rent/Annum" over the group's rows (None when absent).
@@ -687,35 +706,17 @@ pub async fn commit(pool: &PgPool, caller: &Session, bytes: &[u8]) -> ServiceRes
             let row = contracts::find(&mut *tx, existing).await?;
             let mut filled = Vec::new();
             if let Some(row) = row {
-                let rent = rent_amount(&g).map(|a| (a * 100.0).round() as i64);
-                let rent_missing = row.rent_amount_minor.is_none() && rent.is_some();
-                let tenants_missing = row.occupant_count == 0 && tenants(&g) > 0;
+                let rent_missing =
+                    row.unit_rent_amounts.iter().any(Option::is_none) && rent_amount(&g).is_some();
+                let tenants_missing = row.unit_occupant_counts.contains(&0) && tenants(&g) > 0;
                 if rent_missing || tenants_missing {
-                    let unit_tenants: Vec<(uuid::Uuid, i32)> = if tenants_missing {
-                        g.rows
-                            .iter()
-                            .filter_map(|r| {
-                                let id = unit_ids
-                                    .get(&(
-                                        norm(&g.building),
-                                        norm(&unit_number(&g.building, &r.unit)),
-                                    ))
-                                    .copied()?;
-                                let n = i32::try_from(r.capacity.unwrap_or(0).clamp(0, 500))
-                                    .unwrap_or(0);
-                                row.unit_ids.contains(&id).then_some((id, n))
-                            })
-                            .collect()
-                    } else {
-                        Vec::new()
-                    };
-                    contracts::set_rent_and_tenants(
-                        &mut tx,
-                        existing,
-                        if rent_missing { rent } else { None },
-                        &unit_tenants,
-                    )
-                    .await?;
+                    let terms: Vec<UnitTerms> = g
+                        .rows
+                        .iter()
+                        .filter_map(|r| row_terms(&g.building, r, &unit_ids))
+                        .filter(|t| row.unit_ids.contains(&t.unit_id))
+                        .collect();
+                    contracts::fill_unit_terms(&mut tx, existing, &terms).await?;
                     if rent_missing {
                         filled.push("rent");
                     }
@@ -779,28 +780,21 @@ pub async fn commit(pool: &PgPool, caller: &Session, bytes: &[u8]) -> ServiceRes
             })
             .collect::<Vec<_>>()
             .join("\n");
-        // Capacity on the sheet = number of tenants in that unit.
-        let unit_tenants: Vec<(uuid::Uuid, i32)> = g
+        let unit_terms: Vec<UnitTerms> = g
             .rows
             .iter()
-            .filter_map(|r| {
-                let id = unit_ids
-                    .get(&(norm(&g.building), norm(&unit_number(&g.building, &r.unit))))
-                    .copied()?;
-                let n = i32::try_from(r.capacity.unwrap_or(0).clamp(0, 500)).unwrap_or(0);
-                ids.contains(&id).then_some((id, n))
-            })
+            .filter_map(|r| row_terms(&g.building, r, &unit_ids))
+            .filter(|t| ids.contains(&t.unit_id))
             .collect();
         let input = ContractInput {
             contract_number: number,
             tenant_id,
             building_id,
             unit_ids: ids.clone(),
-            unit_tenants,
+            unit_terms,
             start_date: g.start,
             end_date: g.end,
             rent_terms: rent_terms(&g),
-            rent_amount_minor: rent_amount(&g).map(|a| (a * 100.0).round() as i64),
             assigned_employee_id: None,
             notes: Some(format!("Imported from Excel\n{notes}")),
         };

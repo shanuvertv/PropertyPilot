@@ -109,7 +109,7 @@ export interface UnitSummary {
   notes: string | null;
   contractId: string | null;
   contractNumber: string | null;
-  /** Rent on the active contract (the contract may cover several units). */
+  /** This unit's rent under its active contract. */
   rentAmount: number | null;
   tenantId: string | null;
   tenantName: string | null;
@@ -206,15 +206,15 @@ export interface Contract {
   buildingCode: string;
   unitIds: string[];
   unitNumbers: string;
-  /** Number of tenants per unit on this contract. */
-  unitTenants: ContractUnitTenants[];
+  /** Tenants and rent per unit on this contract. */
+  unitTerms: ContractUnitTerms[];
   /** Number of tenants on the whole contract. */
   occupantCount: number;
   startDate: string;
   endDate: string;
   durationMonths: number;
   rentTerms: string | null;
-  /** Rent for the contract (AED); optional. */
+  /** Rent for the whole contract — the sum of the units' rents; null when none recorded. */
   rentAmount: number | null;
   status: ContractStatus;
   assignedEmployeeId: string | null;
@@ -239,10 +239,12 @@ export interface Contract {
   updatedAt: string;
 }
 
-/** How many people live in one unit under a contract (what that unit's bills are split by). */
-export interface ContractUnitTenants {
+/** What the contract says about one of its units: people living there (bills split by it) and rent. */
+export interface ContractUnitTerms {
   unitId: string;
   occupantCount: number;
+  /** Rent for this unit (AED); null when not recorded. */
+  rentAmount: number | null;
 }
 
 export interface ContractInput {
@@ -250,12 +252,11 @@ export interface ContractInput {
   tenantId: string;
   buildingId: string;
   unitIds: string[];
-  /** Number of tenants per unit; units not listed get 0. */
-  unitTenants: ContractUnitTenants[];
+  /** Tenants and rent per unit; units not listed get 0 tenants and no rent. */
+  unitTerms: ContractUnitTerms[];
   startDate: string;
   endDate: string;
   rentTerms: string | null;
-  rentAmount?: number | null;
   assignedEmployeeId: string | null;
   notes: string | null;
   activate?: boolean;
@@ -371,8 +372,8 @@ export interface CompleteRenewalRequest {
   startDate: string;
   endDate: string;
   rentTerms: string | null;
-  /** New rent; null keeps the old contract's amount. */
-  rentAmount?: number | null;
+  /** New tenants / rent per unit; omitted keeps the old contract's figures. */
+  unitTerms?: ContractUnitTerms[] | null;
   notes: string | null;
 }
 

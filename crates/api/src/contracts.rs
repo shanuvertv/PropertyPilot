@@ -24,15 +24,15 @@ pub struct Contract {
     pub building_code: String,
     pub unit_ids: Vec<String>,
     pub unit_numbers: String,
-    /// Number of tenants per unit on this contract.
-    pub unit_tenants: Vec<ContractUnitTenants>,
+    /// Tenants and rent per unit on this contract.
+    pub unit_terms: Vec<ContractUnitTerms>,
     /// Number of tenants on the whole contract.
     pub occupant_count: i64,
     pub start_date: String,
     pub end_date: String,
     pub duration_months: i32,
     pub rent_terms: Option<String>,
-    /// Rent for the contract (major units, e.g. 120000.00); optional.
+    /// Rent for the whole contract — the sum of the units' rents; null when none recorded.
     pub rent_amount: Option<f64>,
     pub status: ContractStatus,
     pub assigned_employee_id: Option<String>,
@@ -57,13 +57,18 @@ pub struct Contract {
     pub updated_at: String,
 }
 
-/// How many people live in one unit under a contract (what that unit's bills are split by).
+/// What the contract says about one of its units: how many people live there (what its
+/// bills are split by) and its rent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct ContractUnitTenants {
+pub struct ContractUnitTerms {
     pub unit_id: String,
+    #[serde(default)]
     pub occupant_count: i64,
+    /// Rent for this unit (major units); null when not recorded.
+    #[serde(default)]
+    pub rent_amount: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,15 +79,13 @@ pub struct ContractInput {
     pub tenant_id: String,
     pub building_id: String,
     pub unit_ids: Vec<String>,
-    /// Number of tenants per unit on the contract; units not listed get 0.
+    /// Tenants and rent per unit; units not listed get 0 tenants and no rent.
     #[serde(default)]
-    pub unit_tenants: Vec<ContractUnitTenants>,
+    pub unit_terms: Vec<ContractUnitTerms>,
     /// ISO date `YYYY-MM-DD`.
     pub start_date: String,
     pub end_date: String,
     pub rent_terms: Option<String>,
-    #[serde(default)]
-    pub rent_amount: Option<f64>,
     pub assigned_employee_id: Option<String>,
     pub notes: Option<String>,
     /// Create straight into Active (default) or leave as Draft.
@@ -286,9 +289,9 @@ pub struct CompleteRenewalRequest {
     pub start_date: String,
     pub end_date: String,
     pub rent_terms: Option<String>,
-    /// New rent; omitted = the old contract's amount.
+    /// New tenants / rent per unit; omitted = the old contract's figures.
     #[serde(default)]
-    pub rent_amount: Option<f64>,
+    pub unit_terms: Option<Vec<ContractUnitTerms>>,
     pub notes: Option<String>,
 }
 

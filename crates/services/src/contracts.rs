@@ -86,16 +86,19 @@ async fn validate(
         .ok_or(ServiceError::NotFound("building"))?;
     input.unit_ids.sort();
     input.unit_ids.dedup();
-    for (unit_id, n) in &input.unit_tenants {
-        if !input.unit_ids.contains(unit_id) {
+    for t in &input.unit_terms {
+        if !input.unit_ids.contains(&t.unit_id) {
             return Err(ServiceError::validation(
-                "a number of tenants was given for a unit that is not on the contract",
+                "tenants or rent were given for a unit that is not on the contract",
             ));
         }
-        if !(0..=500).contains(n) {
+        if !(0..=500).contains(&t.occupant_count) {
             return Err(ServiceError::validation(
                 "the number of tenants must be between 0 and 500",
             ));
+        }
+        if t.rent_amount_minor.is_some_and(|r| r < 0) {
+            return Err(ServiceError::validation("the rent cannot be negative"));
         }
     }
     let found = units::find_many(&mut *conn, &input.unit_ids).await?;

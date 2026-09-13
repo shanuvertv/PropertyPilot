@@ -149,10 +149,7 @@ pub async fn complete(
         start_date: dto::date(&req.start_date, "new start date")?,
         end_date: dto::date(&req.end_date, "new end date")?,
         rent_terms: req.rent_terms,
-        rent_amount_minor: req
-            .rent_amount
-            .map(|a| dto::minor(a, "rent amount"))
-            .transpose()?,
+        unit_terms: req.unit_terms.as_deref().map(dto::unit_terms).transpose()?,
         notes: req.notes,
     };
     let (case, new_contract) = renewals::complete(&state.pool, &caller, id, input).await?;

@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ClipboardCheck, MessageSquare, Plus } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import type { FollowUp, FollowUpType, RenewalStatus, TenantResponse } from "@/api/types-domain";
+import type { FollowUp, FollowUpType, RenewalStatus, TenantResponse, Contract, ContractUnitTerms } from "@/api/types-domain";
 import { ExpiryChip, FollowUpStatusBadge, NoticeStatusBadge, RenewalStatusBadge } from "@/components/badges";
-import { FormDialog, SelectField, TextAreaField, TextField, errorMessage, opt, selectClass } from "@/components/forms";
+import { FormDialog, SelectField, TextAreaField, TextField, errorMessage, opt, selectClass, Field } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useApp } from "@/lib/app-state";
+import { parseUnitTerms, UnitTermsTable, type UnitTermsDraft } from "@/pages/contracts/ContractDialog";
 import { FOLLOW_UP_TYPE_LABEL, RENEWAL_STATUS_LABEL, TENANT_RESPONSE_LABEL, addDaysIso, formatDate, formatDateTime, keys, todayIso, formatMoney } from "@/lib/format";
 import { useEmployees } from "@/lib/queries";
 import { NoticePanel } from "@/pages/renewals/NoticePanel";
@@ -352,7 +353,7 @@ export function RenewalCasePage() {
 
       <ResponseDialog open={responseDlg} onOpenChange={setResponseDlg} caseId={id} onSaved={invalidate} />
       <FollowUpDialog open={followUpDlg.open} onOpenChange={(o) => setFollowUpDlg((d) => ({ ...d, open: o }))} caseId={id} edit={followUpDlg.edit} onSaved={invalidate} />
-      <CompleteDialog open={completeDlg} onOpenChange={setCompleteDlg} caseId={id} contractEnd={rc.endDate} contractNumber={rc.contractNumber} rentTerms={contract.rentTerms} rentAmount={contract.rentAmount} onDone={(newId) => navigate(`/contracts/${newId}`)} />
+      <CompleteDialog open={completeDlg} onOpenChange={setCompleteDlg} caseId={id} contractEnd={rc.endDate} contractNumber={rc.contractNumber} rentTerms={contract.rentTerms} units={contract.unitTerms.map((t) => ({ id: t.unitId, label: unitLabel(contract, t.unitId), terms: t }))} onDone={(newId) => navigate(`/contracts/${newId}`)} />
       <FormDialog
         open={statusDlg !== null}
         onOpenChange={(o) => !o && setStatusDlg(null)}
@@ -443,11 +444,19 @@ export function FollowUpDialog({ open, onOpenChange, caseId, edit, onSaved }: { 
   );
 }
 
-function CompleteDialog({ open, onOpenChange, caseId, contractEnd, contractNumber, rentTerms, rentAmount, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; caseId: string; contractEnd: string; contractNumber: string; rentTerms: string | null; rentAmount: number | null; onDone: (newContractId: string) => void }) {
+/** "101" for a unit id, from the contract's comma-separated unit numbers (same order as unitIds). */
+function unitLabel(contract: Contract, unitId: string): string {
+  const i = contract.unitIds.indexOf(unitId);
+  const numbers = contract.unitNumbers.split(",").map((x) => x.trim());
+  return i >= 0 && numbers[i] ? numbers[i] : "…";
+}
+
+function CompleteDialog({ open, onOpenChange, caseId, contractEnd, contractNumber, rentTerms, units, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; caseId: string; contractEnd: string; contractNumber: string; rentTerms: string | null; units: { id: string; label: string; terms: ContractUnitTerms }[]; onDone: (newContractId: string) => void }) {
   const { api } = useApp();
   const queryClient = useQueryClient();
   const start = addDaysIso(contractEnd, 1);
-  const [form, setForm] = useState({ contractNumber: "", startDate: start, endDate: addDaysIso(start, 364), rentTerms: rentTerms ?? "", rentAmount: rentAmount === null ? "" : rentAmount.toFixed(2), notes: "" });
+  const [form, setForm] = useState({ contractNumber: "", startDate: start, endDate: addDaysIso(start, 364), rentTerms: rentTerms ?? "", notes: "" });
+  const [unitTerms, setUnitTerms] = useState<UnitTermsDraft>(() => Object.fromEntries(units.map((u) => [u.id, { tenants: String(u.terms.occupantCount), rent: u.terms.rentAmount === null ? "" : u.terms.rentAmount.toFixed(2) }])));
   return (
     <FormDialog
       open={open}
@@ -456,14 +465,12 @@ function CompleteDialog({ open, onOpenChange, caseId, contractEnd, contractNumbe
       description={`Closes ${contractNumber} as Renewed and creates the linked new contract, Active from its start date. Tenant, building and units are copied.`}
       submitLabel="Create new contract"
       onSubmit={async () => {
-        const newRent = form.rentAmount.trim() ? Number(form.rentAmount) : null;
-        if (newRent !== null && (!Number.isFinite(newRent) || newRent < 0)) throw new Error("Enter the new rent as a number of AED (0 or more).");
         const res = await api.completeRenewal(caseId, {
           contractNumber: opt(form.contractNumber),
           startDate: form.startDate,
           endDate: form.endDate,
           rentTerms: opt(form.rentTerms),
-          rentAmount: newRent === null ? null : Math.round(newRent * 100) / 100,
+          unitTerms: units.map((u) => parseUnitTerms(u.id, unitTerms[u.id])),
           notes: opt(form.notes),
         });
         await queryClient.invalidateQueries();
@@ -474,8 +481,10 @@ function CompleteDialog({ open, onOpenChange, caseId, contractEnd, contractNumbe
         <TextField id="cr-number" label="New contract number" value={form.contractNumber} onChange={(v) => setForm({ ...form, contractNumber: v })} placeholder={`${contractNumber}-R…`} hint="Leave blank to number it automatically." className="sm:col-span-2" />
         <TextField id="cr-start" label="New start date" type="date" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} required />
         <TextField id="cr-end" label="New end date" type="date" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} required />
-        <TextField id="cr-rent-amount" label="New rent amount (AED)" type="number" value={form.rentAmount} onChange={(v) => setForm({ ...form, rentAmount: v })} hint={rentAmount === null ? "The old contract has no rent amount recorded." : `Previous contract: ${formatMoney(rentAmount)}.`} />
-        <TextField id="cr-rent" label="Payment terms" value={form.rentTerms} onChange={(v) => setForm({ ...form, rentTerms: v })} />
+        <Field label="Tenants and rent per unit on the new contract" className="sm:col-span-2" hint="Pre-filled from the current contract — change the rent here if it goes up.">
+          <UnitTermsTable units={units.map((u) => ({ id: u.id, label: u.label }))} value={unitTerms} onChange={setUnitTerms} />
+        </Field>
+        <TextField id="cr-rent" label="Payment terms" value={form.rentTerms} onChange={(v) => setForm({ ...form, rentTerms: v })} className="sm:col-span-2" />
         <TextAreaField id="cr-notes" label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} className="sm:col-span-2" />
       </div>
     </FormDialog>

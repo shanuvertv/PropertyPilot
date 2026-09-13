@@ -155,7 +155,10 @@ export function ContractDetailPage() {
             </div>
             <div>
               <div className="text-[12px] text-muted-foreground">Rent amount</div>
-              <div className="tabular-nums">{c.rentAmount === null ? "—" : formatMoney(c.rentAmount)}</div>
+              <div className="tabular-nums">
+                {c.rentAmount === null ? "—" : formatMoney(c.rentAmount)}
+                {c.unitIds.length > 1 && c.rentAmount !== null && <span className="text-[12px] text-muted-foreground"> · total of {c.unitIds.length} units</span>}
+              </div>
             </div>
             <div>
               <div className="text-[12px] text-muted-foreground">Payment terms</div>
@@ -165,7 +168,7 @@ export function ContractDetailPage() {
               <div className="text-[12px] text-muted-foreground">Number of tenants</div>
               <div className="tabular-nums">
                 {c.occupantCount}
-                {c.unitIds.length > 1 && <span className="text-[12px] text-muted-foreground"> · {c.unitTenants.map((t) => t.occupantCount).join(" + ")} by unit</span>}
+                {c.unitIds.length > 1 && <span className="text-[12px] text-muted-foreground"> · {c.unitTerms.map((t) => t.occupantCount).join(" + ")} by unit</span>}
               </div>
             </div>
             {c.notes && (
@@ -244,7 +247,8 @@ export function ContractDetailPage() {
               <li key={u.id} className="flex items-center gap-3 px-4 py-2.5 text-[13.5px]">
                 <span className="w-24 font-medium">{u.unitNumber}</span>
                 <span className="flex-1 text-muted-foreground">{[u.floor && `Floor ${u.floor}`, u.unitType].filter(Boolean).join(" · ")}</span>
-                <span className="text-[12.5px] text-muted-foreground tabular-nums">{c.unitTenants.find((t) => t.unitId === u.id)?.occupantCount ?? 0} tenants</span>
+                <span className="text-[12.5px] text-muted-foreground tabular-nums">{c.unitTerms.find((t) => t.unitId === u.id)?.occupantCount ?? 0} tenants</span>
+                <span className="w-32 text-right text-[12.5px] tabular-nums">{(() => { const r = c.unitTerms.find((t) => t.unitId === u.id)?.rentAmount ?? null; return r === null ? "—" : formatMoney(r); })()}</span>
                 <UnitStatusBadge status={u.status} />
               </li>
             ))}

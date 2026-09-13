@@ -240,13 +240,15 @@ pub fn contract(c: ContractRow) -> Contract {
         building_id: c.building_id.to_string(),
         building_name: c.building_name,
         building_code: c.building_code,
-        unit_tenants: c
+        unit_terms: c
             .unit_ids
             .iter()
             .zip(c.unit_occupant_counts.iter())
-            .map(|(u, n)| ContractUnitTenants {
+            .zip(c.unit_rent_amounts.iter())
+            .map(|((u, n), r)| ContractUnitTerms {
                 unit_id: u.to_string(),
                 occupant_count: i64::from(*n),
+                rent_amount: r.map(money),
             })
             .collect(),
         occupant_count: c.occupant_count,
@@ -622,6 +624,22 @@ pub fn expense_input(i: &ExpenseInput) -> Result<renewal_db::expenses::ExpenseIn
         split_count: count(i.split_count.unwrap_or(0), "number of people")?,
         notes: i.notes.clone(),
     })
+}
+
+/// Per-unit terms from the wire: ids, counts and rents checked.
+pub fn unit_terms(
+    terms: &[ContractUnitTerms],
+) -> Result<Vec<renewal_db::contracts::UnitTerms>, ApiFailure> {
+    terms
+        .iter()
+        .map(|t| {
+            Ok(renewal_db::contracts::UnitTerms {
+                unit_id: uuid(&t.unit_id, "unit")?,
+                occupant_count: count(t.occupant_count, "number of tenants")?,
+                rent_amount_minor: t.rent_amount.map(|a| minor(a, "rent")).transpose()?,
+            })
+        })
+        .collect()
 }
 
 /// A small non-negative count from the wire (people in a unit, shares paid).
