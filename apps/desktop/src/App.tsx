@@ -22,6 +22,9 @@ import { SetupPage } from "@/pages/Setup";
 import { TenantDetailPage } from "@/pages/tenants/TenantDetailPage";
 import { TenantsPage } from "@/pages/tenants/TenantsPage";
 import { UnitsPage } from "@/pages/units/UnitsPage";
+import { UnitPage } from "@/pages/units/UnitPage";
+import { ExpensesPage } from "@/pages/expenses/ExpensesPage";
+import { ExpenseDetailPage } from "@/pages/expenses/ExpenseDetailPage";
 
 function Loading() {
   return (
@@ -59,6 +62,9 @@ export default function App() {
             <Route path="/buildings" element={<Guarded path="/buildings"><BuildingsPage /></Guarded>} />
             <Route path="/buildings/:id" element={<Guarded path="/buildings"><BuildingDetailPage /></Guarded>} />
             <Route path="/units" element={<Guarded path="/units"><UnitsPage /></Guarded>} />
+            <Route path="/units/:id" element={<Guarded path="/units"><UnitPage /></Guarded>} />
+            <Route path="/expenses" element={<Guarded path="/expenses"><ExpensesPage /></Guarded>} />
+            <Route path="/expenses/:id" element={<Guarded path="/expenses"><ExpenseDetailPage /></Guarded>} />
             <Route path="/tenants" element={<Guarded path="/tenants"><TenantsPage /></Guarded>} />
             <Route path="/tenants/:id" element={<Guarded path="/tenants"><TenantDetailPage /></Guarded>} />
             <Route path="/contracts" element={<Guarded path="/contracts"><ContractsPage /></Guarded>} />

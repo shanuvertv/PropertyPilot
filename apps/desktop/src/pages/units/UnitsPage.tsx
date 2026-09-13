@@ -69,6 +69,11 @@ export function UnitsPage() {
       className: "text-right whitespace-nowrap",
       render: (u) => (
         <span className="inline-flex gap-1" onClick={(e) => e.stopPropagation()}>
+          {can("MANAGE_UNITS") && (
+            <Button variant="ghost" size="xs" onClick={() => setDialog({ open: true, unit: u })}>
+              Edit
+            </Button>
+          )}
           {u.contractId && can("VIEW_CONTRACTS") && (
             <Button variant="ghost" size="xs" onClick={() => navigate(`/contracts/${u.contractId}`)}>
               Contract
@@ -172,7 +177,7 @@ export function UnitsPage() {
         sort={state.sort}
         dir={state.dir}
         onSort={toggleSort}
-        onRowClick={can("MANAGE_UNITS") ? (u) => setDialog({ open: true, unit: u }) : undefined}
+        onRowClick={(u) => navigate(`/units/${u.id}`)}
       />
       {query.data && <Paginator page={state.page} pageSize={state.pageSize} total={query.data.total} onPage={(p) => update({ page: p })} />}
       <UnitDialog open={dialog.open} onOpenChange={(o) => setDialog((d) => ({ ...d, open: o }))} unit={dialog.unit} />

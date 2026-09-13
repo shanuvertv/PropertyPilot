@@ -72,6 +72,14 @@ import type {
   MailConfigInput,
   MailConfigView,
   MailTestResult,
+  Occupant,
+  OccupantInput,
+  Expense,
+  ExpenseInput,
+  ExpenseDetail,
+  ExpenseListParams,
+  ExpenseSummary,
+  ExpenseSummaryParams,
 } from "./types-domain";
 
 /** Thrown for any non-2xx response, or when the server cannot be reached at all. */
@@ -478,6 +486,50 @@ export class ApiClient {
 
   deleteUser(id: string) {
     return this.request<void>("DELETE", `/api/users/${id}`);
+  }
+
+  // ---- occupants & expenses
+  occupants(unitId: string, includePast = false) {
+    return this.request<Occupant[]>("GET", `/api/units/${unitId}/occupants${qs({ includePast })}`);
+  }
+  createOccupant(unitId: string, input: OccupantInput) {
+    return this.request<Occupant>("POST", `/api/units/${unitId}/occupants`, input);
+  }
+  updateOccupant(id: string, input: OccupantInput) {
+    return this.request<Occupant>("PUT", `/api/occupants/${id}`, input);
+  }
+  moveOutOccupant(id: string, moveOut: string | null) {
+    return this.request<Occupant>("POST", `/api/occupants/${id}/move-out`, { moveOut });
+  }
+  deleteOccupant(id: string) {
+    return this.request<void>("DELETE", `/api/occupants/${id}`);
+  }
+  expenses(p: ExpenseListParams) {
+    return this.request<Page<Expense>>("GET", `/api/expenses${qs(p)}`);
+  }
+  expense(id: string) {
+    return this.request<ExpenseDetail>("GET", `/api/expenses/${id}`);
+  }
+  createExpense(input: ExpenseInput) {
+    return this.request<Expense>("POST", "/api/expenses", input);
+  }
+  updateExpense(id: string, input: ExpenseInput) {
+    return this.request<Expense>("PUT", `/api/expenses/${id}`, input);
+  }
+  deleteExpense(id: string) {
+    return this.request<void>("DELETE", `/api/expenses/${id}`);
+  }
+  splitExpenseEqually(id: string) {
+    return this.request<ExpenseDetail>("POST", `/api/expenses/${id}/split`);
+  }
+  setExpenseShares(id: string, shares: { occupantId: string; amount: number }[]) {
+    return this.request<ExpenseDetail>("PUT", `/api/expenses/${id}/shares`, { shares });
+  }
+  settleShare(id: string, occupantId: string, settled: boolean) {
+    return this.request<ExpenseDetail>("PUT", `/api/expenses/${id}/shares/${occupantId}/settled`, { settled });
+  }
+  expenseSummary(p: ExpenseSummaryParams) {
+    return this.request<ExpenseSummary>("GET", `/api/expenses/summary${qs(p)}`);
   }
 
   // ---- passwords

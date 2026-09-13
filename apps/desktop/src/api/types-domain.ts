@@ -47,7 +47,7 @@ export type TenantResponse =
 export type FollowUpType = "PHONE_CALL" | "EMAIL" | "MEETING" | "WHATS_APP" | "INTERNAL_DISCUSSION";
 export type FollowUpStatus = "OPEN" | "DONE" | "CANCELLED";
 export type Band = "EXPIRED" | "DAYS_0_TO_30" | "DAYS_31_TO_60" | "DAYS_61_TO_90" | "DAYS_91_TO_120" | "BEYOND_120";
-export type DocumentEntity = "building" | "tenant" | "contract" | "notice";
+export type DocumentEntity = "building" | "tenant" | "contract" | "notice" | "expense";
 
 // ---------------------------------------------------------------- buildings
 
@@ -769,4 +769,144 @@ export interface ImportResult {
   contractsCreated: number;
   contractsSkipped: number;
   warnings: string[];
+}
+
+// ---------------------------------------------------------------- occupants & expenses
+
+export type ExpenseCategory = "ELECTRICITY" | "WATER" | "GAS" | "INTERNET" | "MAINTENANCE" | "CLEANING" | "MUNICIPALITY" | "OTHER";
+export type SplitMethod = "NONE" | "EQUAL" | "CUSTOM";
+
+export interface Occupant {
+  id: string;
+  unitId: string;
+  unitNumber: string;
+  buildingId: string;
+  buildingName: string;
+  tenantId: string | null;
+  tenantName: string | null;
+  fullName: string;
+  idNumber: string | null;
+  phone: string | null;
+  email: string | null;
+  bedLabel: string | null;
+  moveIn: string;
+  moveOut: string | null;
+  current: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OccupantInput {
+  tenantId: string | null;
+  fullName: string;
+  idNumber: string | null;
+  phone: string | null;
+  email: string | null;
+  bedLabel: string | null;
+  moveIn: string;
+  moveOut: string | null;
+  notes: string | null;
+}
+
+export interface Expense {
+  id: string;
+  unitId: string;
+  unitNumber: string;
+  buildingId: string;
+  buildingName: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  expenseDate: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  vendor: string | null;
+  reference: string | null;
+  splitMethod: SplitMethod;
+  notes: string | null;
+  shareCount: number;
+  settledCount: number;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseInput {
+  unitId: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  expenseDate: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  vendor: string | null;
+  reference: string | null;
+  splitMethod: SplitMethod;
+  notes: string | null;
+}
+
+export interface ExpenseShare {
+  occupantId: string;
+  occupantName: string;
+  bedLabel: string | null;
+  amount: number;
+  settledAt: string | null;
+}
+
+export interface ExpenseDetail {
+  expense: Expense;
+  shares: ExpenseShare[];
+  occupants: Occupant[];
+}
+
+export interface ExpenseListParams extends ListParams {
+  unitId?: string;
+  buildingId?: string;
+  category?: ExpenseCategory | "";
+  from?: string;
+  to?: string;
+  outstanding?: boolean;
+}
+
+export interface MonthPoint {
+  month: string;
+  amount: number;
+  expenseCount: number;
+}
+
+export interface GroupPoint {
+  id: string;
+  label: string;
+  sublabel: string | null;
+  amount: number;
+  expenseCount: number;
+}
+
+export interface CategoryPoint {
+  category: ExpenseCategory;
+  amount: number;
+  expenseCount: number;
+}
+
+export interface ExpenseSummary {
+  from: string;
+  to: string;
+  total: number;
+  expenseCount: number;
+  thisMonth: number;
+  lastMonth: number;
+  outstanding: number;
+  outstandingShares: number;
+  monthly: MonthPoint[];
+  byBuilding: GroupPoint[];
+  byUnit: GroupPoint[];
+  byCategory: CategoryPoint[];
+}
+
+export interface ExpenseSummaryParams {
+  buildingId?: string;
+  unitId?: string;
+  from?: string;
+  to?: string;
 }

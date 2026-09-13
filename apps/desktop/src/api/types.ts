@@ -22,7 +22,11 @@ export type Capability =
   | "VIEW_REPORTS"
   | "MANAGE_SETTINGS"
   | "MANAGE_USERS"
-  | "VIEW_AUDIT_TRAIL";
+  | "VIEW_AUDIT_TRAIL"
+  | "VIEW_OCCUPANTS"
+  | "MANAGE_OCCUPANTS"
+  | "VIEW_EXPENSES"
+  | "MANAGE_EXPENSES";
 
 export const ROLES: Role[] = ["ADMIN", "LEASING", "OPERATIONS", "MANAGEMENT"];
 

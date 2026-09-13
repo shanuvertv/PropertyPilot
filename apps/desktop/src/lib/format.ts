@@ -1,10 +1,12 @@
 import type {
   Band,
   ContractStatus,
+  ExpenseCategory,
   FollowUpStatus,
   FollowUpType,
   NoticeStatus,
   RenewalStatus,
+  SplitMethod,
   TenantResponse,
   UnitStatus,
 } from "@/api/types-domain";
@@ -119,4 +121,38 @@ export const BAND_ORDER: Band[] = ["EXPIRED", "DAYS_0_TO_30", "DAYS_31_TO_60", "
 
 export function keys<T extends string>(rec: Record<T, string>): T[] {
   return Object.keys(rec) as T[];
+}
+
+export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
+  ELECTRICITY: "Electricity",
+  WATER: "Water",
+  GAS: "Gas",
+  INTERNET: "Internet",
+  MAINTENANCE: "Maintenance",
+  CLEANING: "Cleaning",
+  MUNICIPALITY: "Municipality",
+  OTHER: "Other",
+};
+
+export const SPLIT_METHOD_LABEL: Record<SplitMethod, string> = {
+  NONE: "Not split (unit cost)",
+  EQUAL: "Split equally between occupants",
+  CUSTOM: "Custom amounts per occupant",
+};
+
+export const CURRENCY = "AED";
+
+/** `1234.5` → "AED 1,234.50" (the app's single currency). */
+export function formatMoney(amount: number | null | undefined, opts?: { compact?: boolean }): string {
+  if (amount === null || amount === undefined || Number.isNaN(amount)) return "—";
+  if (opts?.compact && Math.abs(amount) >= 10_000) {
+    return `${CURRENCY} ${new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(amount)}`;
+  }
+  return `${CURRENCY} ${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}`;
+}
+
+/** "2026-09-01" → "Sep 2026" for month axes. */
+export function formatMonth(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }

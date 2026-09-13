@@ -18,12 +18,16 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Automation: daily sweep marks expired contracts, opens cases, fires reminder rules once
   each; notification centre with live updates and native toasts
 - Reports (5) with Excel/PDF export; full audit trail with per-record history
-- Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix)
+- Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Operations manage occupants, Management view expenses)
 - Excel import of an existing tenant list (preview, then commit; safe to re-run)
 - Android app: the same screens with bottom tabs and card lists; token kept in the app's
   private storage; works over the LAN or the internet (HTTPS)
 - Browser version: the server serves the same UI at `https://<server>/` (set `WEB_DIR` or put
   the `web/` build next to the executable) — no install needed
+- Occupants per unit (shared accommodation): who lives where, move-in/out dates
+- Expenses per unit: bills and costs by category, split equally or by custom amounts between
+  the occupants present on the bill date, per-person settlement, attached bills; dashboard
+  with monthly trend and totals per property, per unit and per category
 
 ## Layout
 
@@ -238,7 +242,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Area | Routes |
 |------|--------|
 | Auth | `health`, `auth/bootstrap`, `auth/login`, `auth/logout`, `auth/me`, `auth/password` |
-| Users | `users`, `users/{id}/active`, `users/{id}/password`, `employees` |
+| Users | `users`, `users/{id}` (delete), `users/{id}/active`, `users/{id}/password`, `employees` |
 | Master data | `buildings`, `buildings/options`, `units`, `units/{id}/status`, `tenants`, `tenants/options`, `documents`, `documents/{id}/download` |
 | Contracts | `contracts`, `contracts/suggest-number`, `contracts/{id}/activate|terminate|assign|renewal`, `contracts/expire-overdue` |
 | Renewals | `renewals`, `renewals/checklist-template`, `renewals/{id}/status|assign|notes|responses|checklist/{item}|complete|follow-ups|notice|notice/pdf|notice/send`, `follow-ups`, `follow-ups/counts` |
@@ -246,6 +250,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `settings/mail`, `settings/mail/test`, `system/sweep`, `system/status` |
 | Reports & audit | `reports/{kind}` (`?format=xlsx|pdf`), `audit`, `audit/{entityType}/{id}` |
 | Import | `import/preview`, `import/commit` (multipart `file` = .xlsx) |
+| Occupants & expenses | `units/{id}/occupants`, `occupants/{id}`, `occupants/{id}/move-out`, `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/shares`, `expenses/{id}/shares/{occupantId}/settled` |
 | Dashboard | `dashboard`, `search` |
 
 Errors are always `{ "error": { "code": "...", "message": "..." } }`.
