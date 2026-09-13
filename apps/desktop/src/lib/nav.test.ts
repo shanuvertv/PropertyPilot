@@ -43,6 +43,6 @@ describe("phoneTabs", () => {
 
   it("keeps every module reachable through the full list", () => {
     expect(NAV.map((i) => i.to)).toContain("/settings");
-    expect(NAV.filter((i) => i.short).map((i) => i.short)).toEqual(["Buildings", "Notices", "Email"]);
+    expect(NAV.filter((i) => i.short).map((i) => i.short)).toEqual(["Buildings", "Notices", "Email", "Import"]);
   });
 });
