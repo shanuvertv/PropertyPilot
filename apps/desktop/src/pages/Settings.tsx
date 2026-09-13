@@ -18,6 +18,7 @@ import { OrganisationCard, ReminderScheduleCard } from "@/pages/settings/Automat
 import { AuditCard } from "@/pages/settings/AuditCard";
 import { ImportCard } from "@/pages/settings/ImportCard";
 import { MailSettingsCard } from "@/pages/settings/MailSettingsCard";
+import { ResetCard } from "@/pages/settings/ResetCard";
 import { ResetPasswordDialog } from "@/components/PasswordDialogs";
 import { FormDialog, selectClass } from "@/components/forms";
 import { SearchBox } from "@/components/SearchBox";
@@ -208,6 +209,8 @@ export function SettingsPage() {
           <EmailTemplatesCard />
 
           <AuditCard />
+
+          <ResetCard />
 
           <ResetPasswordDialog open={resetFor !== null} onOpenChange={(o) => !o && setResetFor(null)} user={resetFor} />
           <FormDialog

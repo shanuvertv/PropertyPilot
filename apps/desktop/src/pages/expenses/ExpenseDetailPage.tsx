@@ -104,11 +104,11 @@ export function ExpenseDetailPage() {
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>Split between the tenants</CardTitle>
+              <CardTitle>Split between the occupants</CardTitle>
               <CardDescription>
                 {split
                   ? `${formatMoney(e.amount)} ÷ ${e.splitCount} = ${formatMoney(perPerson)} each · ${formatMoney(settledTotal)} collected, ${formatMoney(unsettled)} outstanding`
-                  : "This is a unit cost — it is not divided between the tenants."}
+                  : "This is a unit cost — it is not divided between the occupants."}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -171,7 +171,7 @@ export function ExpenseDetailPage() {
                   </Button>
                   {unitCount === 0 && !splitCount.trim() && (
                     <span className="text-[12px] text-muted-foreground">
-                      The unit has no tenants recorded — <Link to={`/units/${e.unitId}`} className="text-primary hover:underline">set the number on the unit</Link> or type it here.
+                      The unit has no occupants recorded — <Link to={`/units/${e.unitId}`} className="text-primary hover:underline">set the number on the unit</Link> or type it here.
                     </span>
                   )}
                 </div>
@@ -211,7 +211,7 @@ export function ExpenseDetailPage() {
                 <dd className="inline-flex items-center gap-1.5"><span className="inline-block size-2 rounded-full" style={{ background: categoryColor(e.category) }} aria-hidden="true" />{EXPENSE_CATEGORY_LABEL[e.category]}</dd>
                 <dt className="text-muted-foreground">Unit</dt>
                 <dd><Link to={`/units/${e.unitId}`} className="text-primary hover:underline">{e.buildingName} · {e.unitNumber}</Link></dd>
-                <dt className="text-muted-foreground">Tenants in unit</dt>
+                <dt className="text-muted-foreground">Occupants in unit</dt>
                 <dd className="tabular-nums">{unit.data ? unit.data.occupantCount : "—"}</dd>
                 <dt className="text-muted-foreground">Date</dt>
                 <dd>{formatDate(e.expenseDate)}</dd>

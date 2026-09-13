@@ -89,12 +89,12 @@ async fn validate(
     for t in &input.unit_terms {
         if !input.unit_ids.contains(&t.unit_id) {
             return Err(ServiceError::validation(
-                "tenants or rent were given for a unit that is not on the contract",
+                "occupants or rent were given for a unit that is not on the contract",
             ));
         }
         if !(0..=500).contains(&t.occupant_count) {
             return Err(ServiceError::validation(
-                "the number of tenants must be between 0 and 500",
+                "the number of occupants must be between 0 and 500",
             ));
         }
         if t.rent_amount_minor.is_some_and(|r| r < 0) {

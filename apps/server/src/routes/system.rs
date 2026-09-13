@@ -1,12 +1,13 @@
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::Json;
-use renewal_api::{HealthResponse, SystemStatus};
+use renewal_api::{HealthResponse, ResetAllRequest, SystemStatus};
 use renewal_services::system;
 
 use crate::auth::CurrentUser;
 use crate::dto::system_status;
 use crate::error::ApiFailure;
-use crate::state::AppState;
+use crate::state::{AppState, LiveEvent};
 use crate::VERSION;
 
 /// Unauthenticated. The client calls this first to decide between Setup, Bootstrap and Login.
@@ -31,4 +32,15 @@ pub async fn status(
 ) -> Result<Json<SystemStatus>, ApiFailure> {
     let info = system::info(&state.pool).await?;
     Ok(Json(system_status(info)))
+}
+
+/// Wipes all property data (Admin; the body must confirm with the word RESET).
+pub async fn reset_all(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Json(req): Json<ResetAllRequest>,
+) -> Result<StatusCode, ApiFailure> {
+    system::reset_all(&state.pool, &caller, &req.confirm).await?;
+    state.publish(LiveEvent::data());
+    Ok(StatusCode::NO_CONTENT)
 }

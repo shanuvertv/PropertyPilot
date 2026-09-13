@@ -133,7 +133,7 @@ async fn resolve_split(
         }
         if input.split_count == 0 {
             return Err(ServiceError::validation(
-                "set the number of tenants living in this unit first, or record the expense without a split",
+                "set the number of occupants on the unit's contract first, or record the expense without a split",
             ));
         }
     } else {

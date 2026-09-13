@@ -101,7 +101,7 @@ export function ExpenseDialog({
     const splitCount = form.splitCount.trim() ? Number(form.splitCount) : 0;
     if (!Number.isInteger(splitCount) || splitCount < 0 || splitCount > 500) throw new Error("The number of people must be a whole number between 1 and 500.");
     if (form.splitMethod === "EQUAL" && splitCount === 0 && !unitCount) {
-      throw new Error("Set the number of tenants in the unit first, or enter how many people share this bill.");
+      throw new Error("Set the number of occupants on the unit's contract first, or enter how many people share this bill.");
     }
     const input: ExpenseInput = {
       unitId: form.unitId,
@@ -128,8 +128,8 @@ export function ExpenseDialog({
       title={edit ? "Edit expense" : "Add expense"}
       description={
         unit
-          ? `For unit ${unit.label}. A bill can be split equally between the tenants living there.`
-          : "A bill or cost that belongs to one unit. It can be split equally between the tenants living there."
+          ? `For unit ${unit.label}. A bill can be split equally between the occupants living there.`
+          : "A bill or cost that belongs to one unit. It can be split equally between the occupants living there."
       }
       submitLabel={edit ? "Save changes" : "Add expense"}
       onSubmit={submit}
@@ -186,10 +186,10 @@ export function ExpenseDialog({
             placeholder={unitCount !== undefined ? String(unitCount) : ""}
             hint={
               unitCount === undefined
-                ? "Leave empty to use the unit's number of tenants."
+                ? "Leave empty to use the unit's number of occupants."
                 : unitCount > 0
-                  ? `Leave empty to use the unit's number of tenants (${unitCount}).`
-                  : "This unit has no tenants recorded yet — enter the number here or set it on the unit."
+                  ? `Leave empty to use the unit's number of occupants (${unitCount}).`
+                  : "This unit has no occupants recorded yet — enter the number here or set it on the unit's contract."
             }
           />
         )}

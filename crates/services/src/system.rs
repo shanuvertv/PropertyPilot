@@ -52,3 +52,33 @@ pub async fn info(pool: &PgPool) -> ServiceResult<SystemInfo> {
         scheduler,
     })
 }
+
+/// Admin-only wipe of all property data (spec: "start again" after a test import). The
+/// caller has to repeat the word RESET; users, settings, templates and the audit trail
+/// survive, and the wipe itself is written to the audit trail.
+pub async fn reset_all(
+    pool: &PgPool,
+    caller: &crate::session::Session,
+    confirm: &str,
+) -> ServiceResult<()> {
+    caller.require(renewal_core::Capability::ManageSettings)?;
+    if confirm.trim() != "RESET" {
+        return Err(crate::error::ServiceError::validation(
+            "type RESET to confirm wiping all data",
+        ));
+    }
+    renewal_db::reset_business_data(pool).await?;
+    let mut tx = pool.begin().await?;
+    crate::audit_log::log(
+        &mut *tx,
+        caller,
+        "settings",
+        uuid::Uuid::nil(),
+        "RESET_ALL_DATA",
+        crate::audit_log::NONE,
+        Some(&"all buildings, units, tenants, contracts, renewals, expenses and documents removed"),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}

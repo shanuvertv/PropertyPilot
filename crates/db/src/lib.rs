@@ -73,3 +73,17 @@ pub async fn today(pool: &PgPool) -> DbResult<chrono::NaiveDate> {
 pub async fn ping(pool: &PgPool) -> DbResult<()> {
     sqlx::query("SELECT 1").execute(pool).await.map(|_| ())
 }
+
+/// Wipes every property record — buildings, units, tenants, contracts, renewals, notices,
+/// follow-ups, emails, documents, expenses, notifications — in one statement. Users, roles,
+/// settings, templates, reminder rules and the audit trail stay.
+pub async fn reset_business_data(pool: &PgPool) -> DbResult<()> {
+    sqlx::query(
+        "TRUNCATE TABLE notifications, reminder_dispatches, expenses, email_attachments, renewal_notices,
+                        email_messages, follow_ups, renewal_responses, renewal_checklist_items, renewal_cases,
+                        documents, document_blobs, contract_units, contracts, units, buildings, tenants",
+    )
+    .execute(pool)
+    .await
+    .map(|_| ())
+}

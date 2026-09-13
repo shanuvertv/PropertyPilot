@@ -481,7 +481,7 @@ function CompleteDialog({ open, onOpenChange, caseId, contractEnd, contractNumbe
         <TextField id="cr-number" label="New contract number" value={form.contractNumber} onChange={(v) => setForm({ ...form, contractNumber: v })} placeholder={`${contractNumber}-R…`} hint="Leave blank to number it automatically." className="sm:col-span-2" />
         <TextField id="cr-start" label="New start date" type="date" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} required />
         <TextField id="cr-end" label="New end date" type="date" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} required />
-        <Field label="Tenants and rent per unit on the new contract" className="sm:col-span-2" hint="Pre-filled from the current contract — change the rent here if it goes up.">
+        <Field label="Occupants and rent per unit on the new contract" className="sm:col-span-2" hint="Pre-filled from the current contract — change the rent here if it goes up.">
           <UnitTermsTable units={units.map((u) => ({ id: u.id, label: u.label }))} value={unitTerms} onChange={setUnitTerms} />
         </Field>
         <TextField id="cr-rent" label="Payment terms" value={form.rentTerms} onChange={(v) => setForm({ ...form, rentTerms: v })} className="sm:col-span-2" />

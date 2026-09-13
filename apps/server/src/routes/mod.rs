@@ -45,6 +45,7 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
         // phase 0
         .route("/api/health", get(system::health))
         .route("/api/system/status", get(system::status))
+        .route("/api/system/reset", post(system::reset_all))
         .route("/api/auth/bootstrap", post(auth::bootstrap))
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/logout", post(auth::logout))

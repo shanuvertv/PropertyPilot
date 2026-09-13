@@ -164,7 +164,7 @@ export function ContractDialog({
           </div>
         </Field>
         {form.unitIds.length > 0 && (
-          <Field label="Tenants and rent per unit" className="sm:col-span-2" hint="People living in each unit (its bills are split equally between them) and that unit's rent for the contract period.">
+          <Field label="Occupants and rent per unit" className="sm:col-span-2" hint="How many people live in each unit (its bills are split equally between them) and that unit's rent for the contract period.">
             <UnitTermsTable
               units={form.unitIds.map((id) => ({ id, label: units.data?.items.find((x) => x.id === id)?.unitNumber ?? "…" }))}
               value={form.unitTerms}
@@ -192,14 +192,14 @@ export type UnitTermsDraft = Record<string, { tenants: string; rent: string }>;
 /** Validates one unit's draft (tenants 0–500, rent ≥ 0) into the API shape. */
 export function parseUnitTerms(unitId: string, draft: { tenants: string; rent: string } | undefined): ContractUnitTerms {
   const n = Number((draft?.tenants ?? "").trim() || "0");
-  if (!Number.isInteger(n) || n < 0 || n > 500) throw new Error("The number of tenants must be a whole number between 0 and 500.");
+  if (!Number.isInteger(n) || n < 0 || n > 500) throw new Error("The number of occupants must be a whole number between 0 and 500.");
   const rentText = (draft?.rent ?? "").trim();
   const rent = rentText ? Number(rentText) : null;
   if (rent !== null && (!Number.isFinite(rent) || rent < 0)) throw new Error("Enter each unit's rent as a number of AED (0 or more).");
   return { unitId, occupantCount: n, rentAmount: rent === null ? null : Math.round(rent * 100) / 100 };
 }
 
-/** Unit | tenants | rent — one row per unit on the contract. */
+/** Unit | occupants | rent — one row per unit on the contract. */
 export function UnitTermsTable({ units, value, onChange }: { units: { id: string; label: string }[]; value: UnitTermsDraft; onChange: (v: UnitTermsDraft) => void }) {
   const set = (id: string, patch: Partial<{ tenants: string; rent: string }>) => onChange({ ...value, [id]: { ...(value[id] ?? { tenants: "", rent: "" }), ...patch } });
   const total = units.reduce((a, u) => a + (Number((value[u.id]?.rent ?? "").trim() || "0") || 0), 0);
@@ -209,7 +209,7 @@ export function UnitTermsTable({ units, value, onChange }: { units: { id: string
         <thead className="bg-muted/50 text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
           <tr>
             <th className="px-3 py-1.5 text-left">Unit</th>
-            <th className="px-3 py-1.5 text-right">No. of tenants</th>
+            <th className="px-3 py-1.5 text-right">No. of occupants</th>
             <th className="px-3 py-1.5 text-right">Rent (AED)</th>
           </tr>
         </thead>
@@ -218,7 +218,7 @@ export function UnitTermsTable({ units, value, onChange }: { units: { id: string
             <tr key={u.id}>
               <td className="px-3 py-1.5 font-medium">Unit {u.label}</td>
               <td className="px-3 py-1.5 text-right">
-                <Input type="number" min={0} max={500} inputMode="numeric" className="ml-auto h-7 w-20 text-right tabular-nums" value={value[u.id]?.tenants ?? ""} placeholder="0" onChange={(e) => set(u.id, { tenants: e.target.value })} aria-label={`Number of tenants in unit ${u.label}`} />
+                <Input type="number" min={0} max={500} inputMode="numeric" className="ml-auto h-7 w-20 text-right tabular-nums" value={value[u.id]?.tenants ?? ""} placeholder="0" onChange={(e) => set(u.id, { tenants: e.target.value })} aria-label={`Number of occupants in unit ${u.label}`} />
               </td>
               <td className="px-3 py-1.5 text-right">
                 <Input type="number" min={0} step="0.01" inputMode="decimal" className="ml-auto h-7 w-32 text-right tabular-nums" value={value[u.id]?.rent ?? ""} placeholder="0.00" onChange={(e) => set(u.id, { rent: e.target.value })} aria-label={`Rent for unit ${u.label}`} />

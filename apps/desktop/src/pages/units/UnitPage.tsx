@@ -80,7 +80,7 @@ export function UnitPage() {
             <div>{u.caseId ? can("VIEW_RENEWALS") ? <Link to={`/renewals/${u.caseId}`} className="hover:underline"><RenewalStatusBadge status={u.renewalStatus} /></Link> : <RenewalStatusBadge status={u.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>}</div>
           </div>
           <div>
-            <div className="text-[12px] text-muted-foreground">Number of tenants</div>
+            <div className="text-[12px] text-muted-foreground">Number of occupants</div>
             <TenantCount unit={u} />
           </div>
           <div>
@@ -110,9 +110,9 @@ export function UnitPage() {
   );
 }
 
-// ---------------------------------------------------------------- number of tenants
+// ---------------------------------------------------------------- number of occupants
 
-/** The number of tenants comes from the unit's active contract; it is edited there. */
+/** The number of occupants comes from the unit's active contract; it is edited there. */
 function TenantCount({ unit }: { unit: UnitSummary }) {
   const { can } = useApp();
   if (!unit.contractId) return <span className="text-muted-foreground">— (no active contract)</span>;
@@ -181,7 +181,7 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
             ))}
           </select>
           <span className="text-[12.5px] text-muted-foreground">
-            {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected from the tenants.` : "Nothing outstanding from the tenants."}
+            {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected from the occupants.` : "Nothing outstanding from the occupants."}
           </span>
           <ViewToggle value={view} onChange={setView} />
         </div>

@@ -65,7 +65,7 @@ export function BuildingDetailPage() {
     { key: "unit", header: "Unit", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
     { key: "floor", header: "Floor", render: (u) => u.floor ?? "—" },
     { key: "type", header: "Type", render: (u) => u.unitType ?? "—" },
-    { key: "people", header: "No. of tenants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
+    { key: "people", header: "No. of occupants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
     { key: "status", header: "Status", card: "badge", render: (u) => <UnitStatusBadge status={u.status} /> },
     { key: "tenant", header: "Tenant", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : "—") },
     { key: "end", header: "Contract end", card: "metric", render: (u) => formatDate(u.endDate) },

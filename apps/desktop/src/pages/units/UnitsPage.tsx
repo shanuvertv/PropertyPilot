@@ -57,7 +57,7 @@ export function UnitsPage() {
     { key: "building", header: "Building", sort: "building_name", card: "subtitle", render: (u) => <Link to={`/buildings/${u.buildingId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.buildingName}</Link> },
     { key: "unit", header: "Unit", sort: "unit_number", card: "title", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
     { key: "type", header: "Type", sort: "unit_type", render: (u) => u.unitType ?? "—" },
-    { key: "people", header: "No. of tenants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
+    { key: "people", header: "No. of occupants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
     { key: "rent", header: "Rent", className: "text-right tabular-nums", card: "metric", render: (u) => (u.rentAmount === null ? "—" : formatMoney(u.rentAmount)) },
     { key: "tenant", header: "Tenant", sort: "tenant_name", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : <span className="text-muted-foreground">—</span>) },
     { key: "start", header: "Start", sort: "start_date", render: (u) => formatDate(u.startDate) },

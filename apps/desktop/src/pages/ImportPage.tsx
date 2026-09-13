@@ -7,7 +7,7 @@ export function ImportPage() {
     <>
       <PageHeader
         title="Import data"
-        description="Load an existing tenant list from Excel: buildings, units, tenants and contracts with their dates, number of tenants (capacity) and rent. Preview first, then confirm; re-running the same file never duplicates."
+        description="Load an existing tenant list from Excel: buildings, units, tenants and contracts with their dates, number of occupants (capacity) and rent. Preview first, then confirm; re-running the same file never duplicates."
       />
       <ImportCard />
     </>

@@ -163,7 +163,7 @@ export function ImportCard() {
                     <TableHead>Units</TableHead>
                     <TableHead>Start</TableHead>
                     <TableHead>End</TableHead>
-                    <TableHead className="text-right">Tenants</TableHead>
+                    <TableHead className="text-right">Occupants</TableHead>
                     <TableHead className="text-right">Rent / annum</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Notes</TableHead>

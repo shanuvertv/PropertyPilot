@@ -147,6 +147,14 @@ pub struct SetUserActiveRequest {
 // ---------------------------------------------------------------- system
 
 /// Public (unauthenticated) probe used by the client before login.
+/// Admin wipe of all property data; `confirm` must be the word `RESET`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct ResetAllRequest {
+    pub confirm: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]

@@ -155,7 +155,7 @@ export function ExpensesPage() {
         <Stat label={period === "12m" ? "Last 12 months" : period === "ytd" ? "This year" : period === "3m" ? "Last 3 months" : period === "custom" ? "Selected dates" : "All time"} value={formatMoney(s?.total)} hint={s ? `${s.expenseCount} expenses` : undefined} />
         <Stat label="This month" value={formatMoney(s?.thisMonth)} hint={delta === null ? undefined : `${delta >= 0 ? "+" : ""}${delta.toFixed(0)}% vs last month`} />
         <Stat label="Last month" value={formatMoney(s?.lastMonth)} />
-        <Stat label="Outstanding from tenants" value={formatMoney(s?.outstanding)} hint={s ? `${s.outstandingShares} unpaid shares` : undefined} />
+        <Stat label="Outstanding from occupants" value={formatMoney(s?.outstanding)} hint={s ? `${s.outstandingShares} unpaid shares` : undefined} />
       </div>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-2">

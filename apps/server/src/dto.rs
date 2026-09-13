@@ -635,7 +635,7 @@ pub fn unit_terms(
         .map(|t| {
             Ok(renewal_db::contracts::UnitTerms {
                 unit_id: uuid(&t.unit_id, "unit")?,
-                occupant_count: count(t.occupant_count, "number of tenants")?,
+                occupant_count: count(t.occupant_count, "number of occupants")?,
                 rent_amount_minor: t.rent_amount.map(|a| minor(a, "rent")).transpose()?,
             })
         })

@@ -10,7 +10,7 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 ## What it does
 
 - Buildings, units and tenants with documents; unit-wise summary with expiry colours
-- Contracts (multi-unit) with rent and number of tenants **per unit** (the contract total is
+- Contracts (multi-unit) with rent and number of occupants **per unit** (the contract total is
   the sum), payment terms, and automatic expiry bands (0–30 / 31–60 / 61–90 / 91–120 / beyond)
 - Renewal cases: 11-status workflow, tenant responses, follow-ups, checklist, completion that
   creates the linked renewal contract and keeps the timeline
@@ -21,8 +21,10 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Reports (5) with Excel/PDF export; full audit trail with per-record history
 - Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Management view expenses)
 - Excel import of an existing tenant list — its own **Import data** page: buildings, units,
-  tenants, contracts with dates and, per unit, the number of tenants (capacity) and rent per annum (preview,
-  then commit; re-running fills in rent / tenants on contracts imported earlier, never duplicates)
+  tenants, contracts with dates and, per unit, the number of occupants (capacity) and rent per annum (preview,
+  then commit; re-running fills in rent / occupants on contracts imported earlier, never duplicates);
+  Settings → **Reset all data** wipes every property record (users, settings, templates and the
+  audit trail stay) to start again from a clean import
 - Android app: the same screens with bottom tabs and card lists; token kept in the app's
   private storage; works over the LAN or the internet (HTTPS)
 - Browser version: the server serves the same UI at `https://<server>/` (set `WEB_DIR` or put
@@ -33,11 +35,11 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Table or card layout on every list (the toggle next to the filters, remembered per list):
   cards show the key figures at a glance — unit counts, contract end and days left, amounts,
   status badges — with the row actions underneath
-- Number of tenants per unit, entered on the contract (per unit it covers — no per-person
+- Number of occupants per unit, entered on the contract (per unit it covers — no per-person
   register); a unit shows the number from its active contract
-- Expenses per unit: bills and costs by category, split equally between that many tenants
+- Expenses per unit: bills and costs by category, split equally between that many occupants
   with a "paid so far" count, attached bills; dashboard with monthly trend and totals per
-  property, per unit and per category, plus what is still outstanding from the tenants
+  property, per unit and per category, plus what is still outstanding from the occupants
 
 ## Layout
 
@@ -260,7 +262,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `settings/mail`, `settings/mail/test`, `system/sweep`, `system/status` |
 | Reports & audit | `reports/{kind}` (`?format=xlsx|pdf`), `audit`, `audit/{entityType}/{id}` |
 | Import | `import/preview`, `import/commit` (multipart `file` = .xlsx) |
-| Expenses | `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/settled` (the number of tenants travels with the contract's `unitTenants`) |
+| Expenses | `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/settled` (occupants and rent per unit travel with the contract's `unitTerms`) |
 | Dashboard | `dashboard`, `search` |
 
 Errors are always `{ "error": { "code": "...", "message": "..." } }`.

@@ -175,6 +175,10 @@ export class ApiClient {
   systemStatus() {
     return this.request<SystemStatus>("GET", "/api/system/status");
   }
+  /** Admin: wipe all property data; `confirm` must be "RESET". */
+  resetAllData(confirm: string) {
+    return this.request<void>("POST", "/api/system/reset", { confirm });
+  }
   employees() {
     return this.request<EmployeeOption[]>("GET", "/api/employees");
   }
