@@ -157,6 +157,13 @@ export function ContractDetailPage() {
               <div className="text-[12px] text-muted-foreground">Rental terms</div>
               <div>{c.rentTerms ?? "—"}</div>
             </div>
+            <div>
+              <div className="text-[12px] text-muted-foreground">Number of tenants</div>
+              <div className="tabular-nums">
+                {c.occupantCount}
+                {c.unitIds.length > 1 && <span className="text-[12px] text-muted-foreground"> · {c.unitTenants.map((t) => t.occupantCount).join(" + ")} by unit</span>}
+              </div>
+            </div>
             {c.notes && (
               <div className="col-span-full">
                 <div className="text-[12px] text-muted-foreground">Notes</div>
@@ -233,6 +240,7 @@ export function ContractDetailPage() {
               <li key={u.id} className="flex items-center gap-3 px-4 py-2.5 text-[13.5px]">
                 <span className="w-24 font-medium">{u.unitNumber}</span>
                 <span className="flex-1 text-muted-foreground">{[u.floor && `Floor ${u.floor}`, u.unitType].filter(Boolean).join(" · ")}</span>
+                <span className="text-[12.5px] text-muted-foreground tabular-nums">{c.unitTenants.find((t) => t.unitId === u.id)?.occupantCount ?? 0} tenants</span>
                 <UnitStatusBadge status={u.status} />
               </li>
             ))}

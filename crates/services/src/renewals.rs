@@ -424,6 +424,13 @@ pub async fn complete(
         tenant_id: old.tenant_id,
         building_id: old.building_id,
         unit_ids: old.unit_ids.clone(),
+        // The renewal keeps the same tenants per unit unless the leasing team changes it later.
+        unit_tenants: old
+            .unit_ids
+            .iter()
+            .copied()
+            .zip(old.unit_occupant_counts.iter().copied())
+            .collect(),
         start_date: input.start_date,
         end_date: input.end_date,
         rent_terms: input.rent_terms.or(old.rent_terms.clone()),

@@ -17,7 +17,7 @@ pub struct UnitSummaryRow {
     pub floor: Option<String>,
     pub unit_type: Option<String>,
     pub status: String,
-    /// How many people live in the unit (what its bills are split by).
+    /// Number of tenants on the unit's active contract (what its bills are split by); 0 when vacant.
     pub occupant_count: i32,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -45,7 +45,6 @@ pub struct UnitInput {
     pub floor: Option<String>,
     pub unit_type: Option<String>,
     pub status: String,
-    pub occupant_count: i32,
     pub notes: Option<String>,
 }
 
@@ -61,7 +60,7 @@ pub struct UnitFilter {
 }
 
 const SELECT: &str = "SELECT u.id, u.building_id, b.name AS building_name, b.code AS building_code, u.unit_number, u.floor,
-       u.unit_type, u.status, u.occupant_count, u.notes, u.created_at, u.updated_at,
+       u.unit_type, u.status, COALESCE(c.unit_occupants, 0) AS occupant_count, u.notes, u.created_at, u.updated_at,
        c.id AS contract_id, c.contract_number, c.start_date, c.end_date,
        t.id AS tenant_id, t.name AS tenant_name,
        e.remaining_days, e.band, e.expiring_soon, e.urgent,
@@ -70,7 +69,7 @@ const SELECT: &str = "SELECT u.id, u.building_id, b.name AS building_name, b.cod
   FROM units u
   JOIN buildings b ON b.id = u.building_id
   LEFT JOIN LATERAL (
-        SELECT c.* FROM contracts c JOIN contract_units cu ON cu.contract_id = c.id
+        SELECT c.*, cu.occupant_count AS unit_occupants FROM contracts c JOIN contract_units cu ON cu.contract_id = c.id
          WHERE cu.unit_id = u.id AND c.status = 'ACTIVE'
          ORDER BY c.end_date DESC LIMIT 1) c ON TRUE
   LEFT JOIN tenants t ON t.id = c.tenant_id
@@ -205,15 +204,14 @@ pub async fn insert<'e>(
     created_by: Uuid,
 ) -> DbResult<Uuid> {
     sqlx::query_scalar(
-        "INSERT INTO units (building_id, unit_number, floor, unit_type, status, occupant_count, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        "INSERT INTO units (building_id, unit_number, floor, unit_type, status, notes, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
     )
     .bind(input.building_id)
     .bind(&input.unit_number)
     .bind(&input.floor)
     .bind(&input.unit_type)
     .bind(&input.status)
-    .bind(input.occupant_count)
     .bind(&input.notes)
     .bind(created_by)
     .fetch_one(ex)
@@ -222,8 +220,7 @@ pub async fn insert<'e>(
 
 pub async fn update<'e>(ex: impl PgExecutor<'e>, id: Uuid, input: &UnitInput) -> DbResult<()> {
     sqlx::query(
-        "UPDATE units SET building_id = $2, unit_number = $3, floor = $4, unit_type = $5, status = $6, occupant_count = $7,
-                notes = $8, updated_at = now()
+        "UPDATE units SET building_id = $2, unit_number = $3, floor = $4, unit_type = $5, status = $6, notes = $7, updated_at = now()
          WHERE id = $1",
     )
     .bind(id)
@@ -232,20 +229,10 @@ pub async fn update<'e>(ex: impl PgExecutor<'e>, id: Uuid, input: &UnitInput) ->
     .bind(&input.floor)
     .bind(&input.unit_type)
     .bind(&input.status)
-    .bind(input.occupant_count)
     .bind(&input.notes)
     .execute(ex)
     .await
     .map(|_| ())
-}
-
-pub async fn set_occupant_count<'e>(ex: impl PgExecutor<'e>, id: Uuid, n: i32) -> DbResult<()> {
-    sqlx::query("UPDATE units SET occupant_count = $2, updated_at = now() WHERE id = $1")
-        .bind(id)
-        .bind(n)
-        .execute(ex)
-        .await
-        .map(|_| ())
 }
 
 pub async fn set_status<'e>(ex: impl PgExecutor<'e>, id: Uuid, status: &str) -> DbResult<()> {

@@ -46,6 +46,7 @@ export function ContractsPage() {
     { key: "tenant", header: "Tenant", sort: "tenant_name", card: "subtitle", render: (c) => <Link to={`/tenants/${c.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{c.tenantName}</Link> },
     { key: "building", header: "Building", sort: "building_name", render: (c) => c.buildingName },
     { key: "units", header: "Units", render: (c) => c.unitNumbers },
+    { key: "people", header: "No. of tenants", className: "text-right tabular-nums", card: "metric", render: (c) => c.occupantCount },
     { key: "start", header: "Start", sort: "start_date", render: (c) => formatDate(c.startDate) },
     { key: "end", header: "End", sort: "end_date", card: "metric", render: (c) => formatDate(c.endDate) },
     { key: "remaining", header: "Remaining", sort: "remaining_days", card: "metric", render: (c) => (c.status === "ACTIVE" ? <ExpiryChip band={c.band} days={c.remainingDays} /> : "—") },

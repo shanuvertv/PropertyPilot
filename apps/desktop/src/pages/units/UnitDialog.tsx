@@ -27,7 +27,7 @@ export function UnitDialog({
   const { api, can } = useApp();
   const queryClient = useQueryClient();
   const buildings = useBuildingOptions();
-  const [form, setForm] = useState({ buildingId: "", unitNumber: "", floor: "", unitType: "", status: "VACANT" as UnitStatus, occupantCount: "0", notes: "" });
+  const [form, setForm] = useState({ buildingId: "", unitNumber: "", floor: "", unitType: "", status: "VACANT" as UnitStatus, notes: "" });
 
   useEffect(() => {
     if (open) {
@@ -37,7 +37,6 @@ export function UnitDialog({
         floor: str(unit?.floor),
         unitType: str(unit?.unitType),
         status: unit?.status ?? "VACANT",
-        occupantCount: String(unit?.occupantCount ?? 0),
         notes: str(unit?.notes),
       });
     }
@@ -46,17 +45,12 @@ export function UnitDialog({
   const occupied = unit?.status === "OCCUPIED";
 
   async function submit() {
-    const occupantCount = Number(form.occupantCount || "0");
-    if (!Number.isInteger(occupantCount) || occupantCount < 0 || occupantCount > 500) {
-      throw new Error("The number of tenants must be a whole number between 0 and 500.");
-    }
     const input: UnitInput = {
       buildingId: form.buildingId,
       unitNumber: form.unitNumber,
       floor: opt(form.floor),
       unitType: opt(form.unitType),
       status: form.status,
-      occupantCount,
       notes: opt(form.notes),
     };
     const saved = unit ? await api.updateUnit(unit.id, input) : await api.createUnit(input);
@@ -106,7 +100,6 @@ export function UnitDialog({
           disabled={occupied}
           hint={occupied ? "Occupied follows the active contract." : undefined}
         />
-        <TextField id="u-tenants" label="Number of tenants" type="number" value={form.occupantCount} onChange={(v) => setForm({ ...form, occupantCount: v })} hint="People living in the unit; its bills are split equally between them." />
         <TextAreaField id="u-notes" label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} className="sm:col-span-2" />
         {unit && can("MANAGE_UNITS") && !occupied && (
           <div className="sm:col-span-2">

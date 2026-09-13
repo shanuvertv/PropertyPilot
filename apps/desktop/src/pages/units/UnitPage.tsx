@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Minus, Pencil, Plus } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import type { Expense, UnitSummary } from "@/api/types-domain";
@@ -14,7 +14,6 @@ import { HistoryPanel } from "@/components/HistoryPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
@@ -109,66 +108,22 @@ export function UnitPage() {
 
 // ---------------------------------------------------------------- number of tenants
 
-/**
- * How many people live in the unit — the number its bills are split by. Admin,
- * Leasing and Operations can change it in place (− / + or type a number).
- */
+/** The number of tenants comes from the unit's active contract; it is edited there. */
 function TenantCount({ unit }: { unit: UnitSummary }) {
-  const { api, can } = useApp();
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const save = useMutation({
-    mutationFn: (n: number) => api.setUnitOccupantCount(unit.id, n),
-    onSuccess: async (updated) => {
-      queryClient.setQueryData(["units", "detail", unit.id], updated);
-      setDraft(null);
-      setError(null);
-      await queryClient.invalidateQueries({ queryKey: ["units"] });
-    },
-    onError: (e) => setError(errorMessage(e, "Could not save the number of tenants.")),
-  });
-  if (!can("MANAGE_OCCUPANTS")) return <div className="tabular-nums">{unit.occupantCount}</div>;
-
-  const commit = () => {
-    if (draft === null) return;
-    const n = Number(draft);
-    if (!Number.isInteger(n) || n < 0 || n > 500) {
-      setError("Enter a whole number between 0 and 500.");
-      return;
-    }
-    if (n === unit.occupantCount) setDraft(null);
-    else save.mutate(n);
-  };
+  const { can } = useApp();
+  if (!unit.contractId) return <span className="text-muted-foreground">— (no active contract)</span>;
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <Button variant="outline" size="icon-xs" aria-label="One tenant fewer" disabled={save.isPending || unit.occupantCount === 0} onClick={() => save.mutate(unit.occupantCount - 1)}>
-        <Minus />
-      </Button>
-      <Input
-        type="number"
-        min={0}
-        max={500}
-        inputMode="numeric"
-        aria-label="Number of tenants"
-        className="h-6 w-14 px-1 text-center tabular-nums"
-        value={draft ?? String(unit.occupantCount)}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-          } else if (e.key === "Escape") {
-            setDraft(null);
-            setError(null);
-          }
-        }}
-      />
-      <Button variant="outline" size="icon-xs" aria-label="One tenant more" disabled={save.isPending || unit.occupantCount >= 500} onClick={() => save.mutate(unit.occupantCount + 1)}>
-        <Plus />
-      </Button>
-      {error && <span className="basis-full text-[12px] text-destructive">{error}</span>}
+    <div className="flex flex-wrap items-baseline gap-x-2">
+      <span className="tabular-nums">{unit.occupantCount}</span>
+      <span className="text-[12px] text-muted-foreground">
+        {can("MANAGE_CONTRACTS") && can("VIEW_CONTRACTS") ? (
+          <>
+            set on <Link to={`/contracts/${unit.contractId}`} className="text-primary hover:underline">contract {unit.contractNumber}</Link>
+          </>
+        ) : (
+          <>from contract {unit.contractNumber}</>
+        )}
+      </span>
     </div>
   );
 }

@@ -43,6 +43,10 @@ pub struct ContractRow {
     pub case_assigned_employee_name: Option<String>,
     pub unit_ids: Vec<Uuid>,
     pub unit_numbers: String,
+    /// Number of tenants per unit, in the same order as `unit_ids`.
+    pub unit_occupant_counts: Vec<i32>,
+    /// Number of tenants on the whole contract.
+    pub occupant_count: i64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -51,6 +55,8 @@ pub struct ContractInput {
     pub tenant_id: Uuid,
     pub building_id: Uuid,
     pub unit_ids: Vec<Uuid>,
+    /// Number of tenants per unit (`unit_id`, count); units not listed get 0.
+    pub unit_tenants: Vec<(Uuid, i32)>,
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub rent_terms: Option<String>,
@@ -87,7 +93,10 @@ pub const SELECT: &str = "SELECT c.id, c.contract_number, c.tenant_id, t.name AS
        (SELECT COALESCE(array_agg(cu.unit_id ORDER BY u.unit_number), ARRAY[]::uuid[])
           FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_ids,
        (SELECT COALESCE(string_agg(u.unit_number, ', ' ORDER BY u.unit_number), '')
-          FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_numbers
+          FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_numbers,
+       (SELECT COALESCE(array_agg(cu.occupant_count ORDER BY u.unit_number), ARRAY[]::int[])
+          FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id) AS unit_occupant_counts,
+       (SELECT COALESCE(sum(cu.occupant_count), 0)::bigint FROM contract_units cu WHERE cu.contract_id = c.id) AS occupant_count
   FROM contracts c
   JOIN tenants t ON t.id = c.tenant_id
   JOIN buildings b ON b.id = c.building_id
@@ -280,25 +289,39 @@ pub async fn insert(conn: &mut PgConnection, c: &InsertContract<'_>) -> DbResult
     .bind(c.created_by)
     .fetch_one(&mut *conn)
     .await?;
-    set_units(conn, id, &c.input.unit_ids).await?;
+    set_units(conn, id, &c.input.unit_ids, &c.input.unit_tenants).await?;
     Ok(id)
 }
 
+/// Replaces the contract's units; each carries its number of tenants (0 unless listed).
 pub async fn set_units(
     conn: &mut PgConnection,
     contract_id: Uuid,
     unit_ids: &[Uuid],
+    unit_tenants: &[(Uuid, i32)],
 ) -> DbResult<()> {
     sqlx::query("DELETE FROM contract_units WHERE contract_id = $1")
         .bind(contract_id)
         .execute(&mut *conn)
         .await?;
     if !unit_ids.is_empty() {
+        let counts: Vec<i32> = unit_ids
+            .iter()
+            .map(|u| {
+                unit_tenants
+                    .iter()
+                    .find(|(id, _)| id == u)
+                    .map(|(_, n)| *n)
+                    .unwrap_or(0)
+            })
+            .collect();
         sqlx::query(
-            "INSERT INTO contract_units (contract_id, unit_id) SELECT $1, unnest($2::uuid[])",
+            "INSERT INTO contract_units (contract_id, unit_id, occupant_count)
+             SELECT $1, unnest($2::uuid[]), unnest($3::int[])",
         )
         .bind(contract_id)
         .bind(unit_ids)
+        .bind(&counts)
         .execute(&mut *conn)
         .await?;
     }
@@ -321,7 +344,7 @@ pub async fn update(conn: &mut PgConnection, id: Uuid, input: &ContractInput) ->
     .bind(&input.notes)
     .execute(&mut *conn)
     .await?;
-    set_units(conn, id, &input.unit_ids).await
+    set_units(conn, id, &input.unit_ids, &input.unit_tenants).await
 }
 
 pub async fn set_status<'e>(ex: impl PgExecutor<'e>, id: Uuid, status: &str) -> DbResult<()> {

@@ -199,11 +199,7 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
             get(automation::get_rules).put(automation::save_rules),
         )
         .route("/api/system/sweep", post(automation::run_sweep))
-        // number of tenants per unit & expenses
-        .route(
-            "/api/units/{id}/occupant-count",
-            put(master::set_unit_occupant_count),
-        )
+        // expenses (split by the number of tenants on the unit's contract)
         .route(
             "/api/expenses",
             get(expenses::list_expenses).post(expenses::create_expense),

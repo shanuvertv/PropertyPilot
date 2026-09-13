@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Contract, ContractInput } from "@/api/types-domain";
 import { Field, FormDialog, SelectField, TextAreaField, TextField, opt, str } from "@/components/forms";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { useApp } from "@/lib/app-state";
 import { UNIT_STATUS_LABEL, addDaysIso, todayIso } from "@/lib/format";
 import { useBuildingOptions, useEmployees, useTenantOptions } from "@/lib/queries";
@@ -31,6 +32,8 @@ export function ContractDialog({
     tenantId: "",
     buildingId: "",
     unitIds: [] as string[],
+    /** Number of tenants per selected unit (text while editing). */
+    unitTenants: {} as Record<string, string>,
     startDate: todayIso(),
     endDate: addDaysIso(todayIso(), 364),
     rentTerms: "",
@@ -47,6 +50,7 @@ export function ContractDialog({
         tenantId: contract.tenantId,
         buildingId: contract.buildingId,
         unitIds: contract.unitIds,
+        unitTenants: Object.fromEntries(contract.unitTenants.map((t) => [t.unitId, String(t.occupantCount)])),
         startDate: contract.startDate,
         endDate: contract.endDate,
         rentTerms: str(contract.rentTerms),
@@ -61,6 +65,7 @@ export function ContractDialog({
         tenantId: defaults?.tenantId ?? "",
         buildingId: defaults?.buildingId ?? "",
         unitIds: defaults?.unitIds ?? [],
+        unitTenants: {},
         startDate: todayIso(),
         endDate: addDaysIso(todayIso(), 364),
         rentTerms: "",
@@ -89,11 +94,17 @@ export function ContractDialog({
   }
 
   async function submit() {
+    const unitTenants = form.unitIds.map((id) => {
+      const n = Number((form.unitTenants[id] ?? "").trim() || "0");
+      if (!Number.isInteger(n) || n < 0 || n > 500) throw new Error("The number of tenants must be a whole number between 0 and 500.");
+      return { unitId: id, occupantCount: n };
+    });
     const input: ContractInput = {
       contractNumber: form.contractNumber,
       tenantId: form.tenantId,
       buildingId: form.buildingId,
       unitIds: form.unitIds,
+      unitTenants,
       startDate: form.startDate,
       endDate: form.endDate,
       rentTerms: opt(form.rentTerms),
@@ -138,7 +149,7 @@ export function ContractDialog({
           id="c-building"
           label="Building"
           value={form.buildingId}
-          onChange={(v) => setForm({ ...form, buildingId: v, unitIds: [] })}
+          onChange={(v) => setForm({ ...form, buildingId: v, unitIds: [], unitTenants: {} })}
           options={(buildings.data ?? []).map((b) => ({ value: b.id, label: `${b.name} (${b.code})` }))}
           placeholder="Select a building"
           required
@@ -156,6 +167,33 @@ export function ContractDialog({
             ))}
           </div>
         </Field>
+        {form.unitIds.length > 0 && (
+          <Field label="Number of tenants" className="sm:col-span-2" hint="People living in each unit under this contract; its bills are split equally between them.">
+            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+              {form.unitIds.map((id) => {
+                const u = units.data?.items.find((x) => x.id === id);
+                return (
+                  <label key={id} className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px]">
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">Unit {u?.unitNumber ?? "…"}</span>
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={500}
+                      inputMode="numeric"
+                      className="h-7 w-20 text-right tabular-nums"
+                      value={form.unitTenants[id] ?? ""}
+                      placeholder="0"
+                      onChange={(e) => setForm((f) => ({ ...f, unitTenants: { ...f.unitTenants, [id]: e.target.value } }))}
+                      aria-label={`Number of tenants in unit ${u?.unitNumber ?? ""}`}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
+        )}
         <TextField id="c-start" label="Start date" type="date" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} required />
         <TextField id="c-end" label="End date" type="date" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} required />
         <TextField id="c-rent" label="Rental terms / rent amount (optional)" value={form.rentTerms} onChange={(v) => setForm({ ...form, rentTerms: v })} placeholder="e.g. AED 120,000 per year, 4 cheques" className="sm:col-span-2" hint="Display only — this system does not do accounting." />

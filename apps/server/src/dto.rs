@@ -239,6 +239,16 @@ pub fn contract(c: ContractRow) -> Contract {
         building_id: c.building_id.to_string(),
         building_name: c.building_name,
         building_code: c.building_code,
+        unit_tenants: c
+            .unit_ids
+            .iter()
+            .zip(c.unit_occupant_counts.iter())
+            .map(|(u, n)| ContractUnitTenants {
+                unit_id: u.to_string(),
+                occupant_count: i64::from(*n),
+            })
+            .collect(),
+        occupant_count: c.occupant_count,
         unit_ids: c.unit_ids.iter().map(|u| u.to_string()).collect(),
         unit_numbers: c.unit_numbers,
         start_date: d(c.start_date),

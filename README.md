@@ -18,7 +18,7 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Automation: daily sweep marks expired contracts, opens cases, fires reminder rules once
   each; notification centre with live updates and native toasts
 - Reports (5) with Excel/PDF export; full audit trail with per-record history
-- Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Operations set the number of tenants per unit, Management view expenses)
+- Roles: Admin, Leasing Team, Operations, Management (server-side permission matrix; Management view expenses)
 - Excel import of an existing tenant list (preview, then commit; safe to re-run)
 - Android app: the same screens with bottom tabs and card lists; token kept in the app's
   private storage; works over the LAN or the internet (HTTPS)
@@ -30,7 +30,8 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Table or card layout on every list (the toggle next to the filters, remembered per list):
   cards show the key figures at a glance — unit counts, contract end and days left, amounts,
   status badges — with the row actions underneath
-- Number of tenants per unit (a count, set on the unit — no per-person register)
+- Number of tenants per unit, entered on the contract (per unit it covers — no per-person
+  register); a unit shows the number from its active contract
 - Expenses per unit: bills and costs by category, split equally between that many tenants
   with a "paid so far" count, attached bills; dashboard with monthly trend and totals per
   property, per unit and per category, plus what is still outstanding from the tenants
@@ -256,7 +257,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `settings/mail`, `settings/mail/test`, `system/sweep`, `system/status` |
 | Reports & audit | `reports/{kind}` (`?format=xlsx|pdf`), `audit`, `audit/{entityType}/{id}` |
 | Import | `import/preview`, `import/commit` (multipart `file` = .xlsx) |
-| Tenants per unit & expenses | `units/{id}/occupant-count`, `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/settled` |
+| Expenses | `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/settled` (the number of tenants travels with the contract's `unitTenants`) |
 | Dashboard | `dashboard`, `search` |
 
 Errors are always `{ "error": { "code": "...", "message": "..." } }`.

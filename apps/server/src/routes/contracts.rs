@@ -86,6 +86,16 @@ fn contract_input(i: &ContractInput) -> Result<renewal_db::contracts::ContractIn
             .iter()
             .map(|u| dto::uuid(u, "unit"))
             .collect::<Result<Vec<_>, _>>()?,
+        unit_tenants: i
+            .unit_tenants
+            .iter()
+            .map(|t| {
+                Ok((
+                    dto::uuid(&t.unit_id, "unit")?,
+                    dto::count(t.occupant_count, "number of tenants")?,
+                ))
+            })
+            .collect::<Result<Vec<_>, ApiFailure>>()?,
         start_date: dto::date(&i.start_date, "start date")?,
         end_date: dto::date(&i.end_date, "end date")?,
         rent_terms: i.rent_terms.clone(),

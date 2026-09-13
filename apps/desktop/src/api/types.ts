@@ -23,7 +23,6 @@ export type Capability =
   | "MANAGE_SETTINGS"
   | "MANAGE_USERS"
   | "VIEW_AUDIT_TRAIL"
-  | "MANAGE_OCCUPANTS"
   | "VIEW_EXPENSES"
   | "MANAGE_EXPENSES";
 

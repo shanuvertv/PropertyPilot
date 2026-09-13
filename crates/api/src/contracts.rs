@@ -24,6 +24,10 @@ pub struct Contract {
     pub building_code: String,
     pub unit_ids: Vec<String>,
     pub unit_numbers: String,
+    /// Number of tenants per unit on this contract.
+    pub unit_tenants: Vec<ContractUnitTenants>,
+    /// Number of tenants on the whole contract.
+    pub occupant_count: i64,
     pub start_date: String,
     pub end_date: String,
     pub duration_months: i32,
@@ -51,6 +55,15 @@ pub struct Contract {
     pub updated_at: String,
 }
 
+/// How many people live in one unit under a contract (what that unit's bills are split by).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct ContractUnitTenants {
+    pub unit_id: String,
+    pub occupant_count: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -59,6 +72,9 @@ pub struct ContractInput {
     pub tenant_id: String,
     pub building_id: String,
     pub unit_ids: Vec<String>,
+    /// Number of tenants per unit on the contract; units not listed get 0.
+    #[serde(default)]
+    pub unit_tenants: Vec<ContractUnitTenants>,
     /// ISO date `YYYY-MM-DD`.
     pub start_date: String,
     pub end_date: String,

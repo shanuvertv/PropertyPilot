@@ -46,9 +46,7 @@ pub enum Capability {
     ManageSettings,
     ManageUsers,
     ViewAuditTrail,
-    /// Set how many people live in a unit (the number the bills are split by).
-    ManageOccupants,
-    /// Bills and costs per unit, split equally between the people living there.
+    /// Bills and costs per unit, split equally between the tenants on the contract.
     ViewExpenses,
     ManageExpenses,
 }
@@ -62,12 +60,7 @@ impl Role {
             Role::Leasing => !matches!(cap, ManageSettings | ManageUsers | ViewAuditTrail),
             Role::Operations => matches!(
                 cap,
-                ViewUnits
-                    | UpdateUnitStatus
-                    | ViewTenants
-                    | ViewBuildings
-                    | ManageOccupants
-                    | ViewExpenses
+                ViewUnits | UpdateUnitStatus | ViewTenants | ViewBuildings | ViewExpenses
             ),
             Role::Management => matches!(
                 cap,

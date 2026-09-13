@@ -104,7 +104,7 @@ export interface UnitSummary {
   floor: string | null;
   unitType: string | null;
   status: UnitStatus;
-  /** How many people live in the unit (what its bills are split by). */
+  /** Number of tenants on the unit's active contract (what its bills are split by); 0 when vacant. */
   occupantCount: number;
   notes: string | null;
   contractId: string | null;
@@ -131,7 +131,6 @@ export interface UnitInput {
   floor: string | null;
   unitType: string | null;
   status: UnitStatus;
-  occupantCount: number;
   notes: string | null;
 }
 
@@ -205,6 +204,10 @@ export interface Contract {
   buildingCode: string;
   unitIds: string[];
   unitNumbers: string;
+  /** Number of tenants per unit on this contract. */
+  unitTenants: ContractUnitTenants[];
+  /** Number of tenants on the whole contract. */
+  occupantCount: number;
   startDate: string;
   endDate: string;
   durationMonths: number;
@@ -232,11 +235,19 @@ export interface Contract {
   updatedAt: string;
 }
 
+/** How many people live in one unit under a contract (what that unit's bills are split by). */
+export interface ContractUnitTenants {
+  unitId: string;
+  occupantCount: number;
+}
+
 export interface ContractInput {
   contractNumber: string;
   tenantId: string;
   buildingId: string;
   unitIds: string[];
+  /** Number of tenants per unit; units not listed get 0. */
+  unitTenants: ContractUnitTenants[];
   startDate: string;
   endDate: string;
   rentTerms: string | null;

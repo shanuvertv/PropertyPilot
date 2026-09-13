@@ -486,10 +486,7 @@ export class ApiClient {
     return this.request<void>("DELETE", `/api/users/${id}`);
   }
 
-  // ---- number of tenants per unit & expenses
-  setUnitOccupantCount(unitId: string, occupantCount: number) {
-    return this.request<UnitSummary>("PUT", `/api/units/${unitId}/occupant-count`, { occupantCount });
-  }
+  // ---- expenses (split by the number of tenants on the unit's contract)
   expenses(p: ExpenseListParams) {
     return this.request<Page<Expense>>("GET", `/api/expenses${qs(p)}`);
   }

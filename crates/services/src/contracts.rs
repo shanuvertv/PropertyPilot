@@ -86,6 +86,18 @@ async fn validate(
         .ok_or(ServiceError::NotFound("building"))?;
     input.unit_ids.sort();
     input.unit_ids.dedup();
+    for (unit_id, n) in &input.unit_tenants {
+        if !input.unit_ids.contains(unit_id) {
+            return Err(ServiceError::validation(
+                "a number of tenants was given for a unit that is not on the contract",
+            ));
+        }
+        if !(0..=500).contains(n) {
+            return Err(ServiceError::validation(
+                "the number of tenants must be between 0 and 500",
+            ));
+        }
+    }
     let found = units::find_many(&mut *conn, &input.unit_ids).await?;
     if found.len() != input.unit_ids.len() {
         return Err(ServiceError::NotFound("one of the selected units"));
