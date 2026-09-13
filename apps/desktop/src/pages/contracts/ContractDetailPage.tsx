@@ -17,6 +17,7 @@ import { useApp } from "@/lib/app-state";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { useEmployees } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { ContractCheques } from "@/pages/cheques/ContractCheques";
 import { ContractDialog } from "./ContractDialog";
 
 export function ContractDetailPage() {
@@ -215,9 +216,10 @@ export function ContractDetailPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="timeline">
+      <Tabs value={search.get("tab") ?? "timeline"} onValueChange={(v) => setSearch((prev) => { const n = new URLSearchParams(prev); if (v === "timeline") n.delete("tab"); else n.set("tab", String(v)); return n; })}>
         <TabsList>
           <TabsTrigger value="timeline">Timeline ({d.chain.length})</TabsTrigger>
+          <TabsTrigger value="cheques">Cheques</TabsTrigger>
           <TabsTrigger value="units">Units ({d.units.length})</TabsTrigger>
           <TabsTrigger value="documents">Documents ({d.documents.length})</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -240,6 +242,9 @@ export function ContractDetailPage() {
               </li>
             ))}
           </ol>
+        </TabsContent>
+        <TabsContent value="cheques" className="pt-4">
+          <ContractCheques contract={c} />
         </TabsContent>
         <TabsContent value="units" className="pt-4">
           <ul className="divide-y rounded-md border bg-card">

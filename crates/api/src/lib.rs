@@ -10,12 +10,14 @@ use renewal_core::{Capability, Role, Thresholds};
 use serde::{Deserialize, Serialize};
 
 pub mod automation;
+pub mod cheques;
 pub mod contracts;
 pub mod email;
 pub mod expenses;
 pub mod master;
 
 pub use automation::*;
+pub use cheques::*;
 pub use contracts::*;
 pub use email::*;
 pub use expenses::*;

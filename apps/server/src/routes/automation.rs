@@ -102,6 +102,7 @@ fn org_dto(o: OrgSettings) -> OrgSettingsDto {
         thresholds: o.thresholds,
         auto_open_case: o.auto_open_case,
         completed_window_days: o.completed_window_days,
+        cheque_reminder_days: o.cheque_reminder_days,
         letterhead: LetterheadDto {
             company_name: o.letterhead.company_name,
             address_lines: o.letterhead.address_lines,
@@ -134,6 +135,7 @@ pub async fn save_org(
             thresholds: input.thresholds,
             auto_open_case: input.auto_open_case,
             completed_window_days: input.completed_window_days,
+            cheque_reminder_days: input.cheque_reminder_days,
             letterhead: Letterhead {
                 company_name: input.letterhead.company_name,
                 address_lines: input

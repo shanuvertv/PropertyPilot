@@ -1,5 +1,6 @@
 import type {
   Band,
+  ChequeStatus,
   ContractStatus,
   ExpenseCategory,
   FollowUpStatus,
@@ -155,3 +156,11 @@ export function formatMonth(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
+
+export const CHEQUE_STATUS_LABEL: Record<ChequeStatus, string> = {
+  PENDING: "Pending",
+  DEPOSITED: "Deposited",
+  CLEARED: "Cleared",
+  BOUNCED: "Bounced",
+  CANCELLED: "Cancelled",
+};

@@ -650,6 +650,8 @@ export interface MailTestResult {
 // ---------------------------------------------------------------- automation (crates/api/src/automation.rs)
 
 export type NotificationKind =
+  | "CHEQUE_DUE"
+  | "CHEQUE_OVERDUE"
   | "CONTRACT_EXPIRING_SOON"
   | "RENEWAL_NOTICE_PENDING"
   | "TENANT_RESPONSE_PENDING"
@@ -695,6 +697,8 @@ export interface OrgSettings {
   thresholds: { expiringSoonDays: number; urgentDays: number };
   autoOpenCase: boolean;
   completedWindowDays: number;
+  /** Days before a rent cheque's date to remind about the deposit (0 = only on the day). */
+  chequeReminderDays: number;
   letterhead: Letterhead;
 }
 
@@ -709,6 +713,7 @@ export interface SweepSummary {
   followUpAlerts: number;
   noticeAlerts: number;
   responseAlerts: number;
+  chequeAlerts: number;
 }
 
 // ---------------------------------------------------------------- reports / audit (phase 7)
@@ -902,4 +907,75 @@ export interface ExpenseSummaryParams {
   unitId?: string;
   from?: string;
   to?: string;
+}
+
+// ---------------------------------------------------------------- cheques (crates/api/src/cheques.rs)
+
+export type ChequeStatus = "PENDING" | "DEPOSITED" | "CLEARED" | "BOUNCED" | "CANCELLED";
+
+export interface Cheque {
+  id: string;
+  contractId: string;
+  contractNumber: string;
+  contractStatus: ContractStatus;
+  tenantId: string;
+  tenantName: string;
+  buildingId: string;
+  buildingName: string;
+  unitNumbers: string;
+  /** 1st, 2nd … cheque of the contract. */
+  seq: number;
+  chequeNumber: string | null;
+  bankName: string | null;
+  amount: number;
+  /** ISO date on the cheque = the day to deposit it. */
+  dueDate: string;
+  status: ChequeStatus;
+  statusChangedAt: string | null;
+  notes: string | null;
+  /** Negative once the cheque date has passed. */
+  daysUntilDue: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChequeInput {
+  chequeNumber: string | null;
+  bankName: string | null;
+  amount: number;
+  dueDate: string;
+  notes: string | null;
+}
+
+export interface GenerateChequesRequest {
+  count: number;
+  firstDate?: string | null;
+  everyMonths?: number | null;
+  total?: number | null;
+  bankName?: string | null;
+  replacePending?: boolean;
+}
+
+export interface ChequeListParams extends ListParams {
+  contractId?: string;
+  buildingId?: string;
+  tenantId?: string;
+  /** Comma-separated statuses. */
+  status?: string;
+  dueFrom?: string;
+  dueTo?: string;
+  overdue?: boolean;
+}
+
+export interface ChequeSummary {
+  overdueCount: number;
+  overdueAmount: number;
+  due7Count: number;
+  due7Amount: number;
+  due30Count: number;
+  due30Amount: number;
+  pendingCount: number;
+  pendingAmount: number;
+  bouncedCount: number;
+  reminderDays: number;
 }

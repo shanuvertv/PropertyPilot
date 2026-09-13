@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Bell, CalendarClock, CheckCheck, Clock, Mail, MessageSquare, UserCheck, XCircle } from "lucide-react";
+import { AlertTriangle, Banknote, Bell, CalendarClock, CheckCheck, Clock, Mail, MessageSquare, UserCheck, XCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import type { Notification, NotificationKind } from "@/api/types-domain";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 
 /** Spec §15 colours: 🔴 expiring / overdue, 🟠 notice pending, 🟡 response pending, 🔵 follow-up today, ⚫ expired. */
 const STYLE: Record<NotificationKind, { icon: typeof Bell; dot: string; label: string }> = {
+  CHEQUE_DUE: { icon: Banknote, dot: "bg-amber-500", label: "Cheque to deposit" },
+  CHEQUE_OVERDUE: { icon: AlertTriangle, dot: "bg-red-600", label: "Cheque not deposited" },
   CONTRACT_EXPIRING_SOON: { icon: AlertTriangle, dot: "bg-red-600", label: "Contract expiring soon" },
   RENEWAL_NOTICE_PENDING: { icon: Mail, dot: "bg-orange-500", label: "Renewal notice pending" },
   TENANT_RESPONSE_PENDING: { icon: MessageSquare, dot: "bg-yellow-500", label: "Tenant response pending" },
@@ -31,7 +33,7 @@ export function targetOf(n: Notification): string {
     case "renewal_case":
       return `/renewals/${n.entityId}`;
     case "contract":
-      return `/contracts/${n.entityId}`;
+      return n.kind === "CHEQUE_DUE" || n.kind === "CHEQUE_OVERDUE" ? `/contracts/${n.entityId}?tab=cheques` : `/contracts/${n.entityId}`;
     case "tenant":
       return `/tenants/${n.entityId}`;
     case "unit":

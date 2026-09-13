@@ -12,6 +12,10 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 - Buildings, units and tenants with documents; unit-wise summary with expiry colours
 - Contracts (multi-unit) with rent and number of occupants **per unit** (the contract total is
   the sum), payment terms, and automatic expiry bands (0–30 / 31–60 / 61–90 / 91–120 / beyond)
+- Post-dated rent cheques per contract: split the rent into N cheques over the period (or add
+  them one by one), edit number / bank / amount / date, mark deposited → cleared / bounced;
+  a Cheques page (overdue, due in 7 / 30 days) and a dashboard block; the daily sweep reminds
+  the assigned employee N days before each cheque date, on the day, and once when overdue
 - Renewal cases: 11-status workflow, tenant responses, follow-ups, checklist, completion that
   creates the linked renewal contract and keeps the timeline
 - Renewal notices: auto-drafted letter → PDF (letterhead) → email with attachment, tracked
@@ -262,6 +266,7 @@ All routes live under `/api`, JSON bodies in camelCase, bearer tokens from `/api
 | Automation | `notifications`, `notifications/count`, `notifications/read-all`, `events` (SSE), `settings/org`, `settings/reminder-rules`, `settings/mail`, `settings/mail/test`, `system/sweep`, `system/status` |
 | Reports & audit | `reports/{kind}` (`?format=xlsx|pdf`), `audit`, `audit/{entityType}/{id}` |
 | Import | `import/preview`, `import/commit` (multipart `file` = .xlsx) |
+| Cheques | `cheques`, `cheques/summary`, `contracts/{id}/cheques`, `contracts/{id}/cheques/generate`, `cheques/{id}`, `cheques/{id}/status` |
 | Expenses | `expenses`, `expenses/summary`, `expenses/{id}`, `expenses/{id}/split`, `expenses/{id}/settled` (occupants and rent per unit travel with the contract's `unitTerms`) |
 | Dashboard | `dashboard`, `search` |
 

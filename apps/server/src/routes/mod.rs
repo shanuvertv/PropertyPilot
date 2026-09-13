@@ -8,6 +8,7 @@ use crate::state::AppState;
 
 mod auth;
 mod automation;
+mod cheques;
 mod contracts;
 mod dashboard;
 mod documents;
@@ -200,7 +201,25 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
             get(automation::get_rules).put(automation::save_rules),
         )
         .route("/api/system/sweep", post(automation::run_sweep))
-        // expenses (split by the number of tenants on the unit's contract)
+        // rent cheques
+        .route("/api/cheques", get(cheques::list))
+        .route("/api/cheques/summary", get(cheques::summary))
+        .route(
+            "/api/contracts/{id}/cheques",
+            get(cheques::for_contract).post(cheques::create),
+        )
+        .route(
+            "/api/contracts/{id}/cheques/generate",
+            post(cheques::generate),
+        )
+        .route(
+            "/api/cheques/{id}",
+            get(cheques::get)
+                .put(cheques::update)
+                .delete(cheques::delete),
+        )
+        .route("/api/cheques/{id}/status", put(cheques::set_status))
+        // expenses (split by the number of occupants on the unit's contract)
         .route(
             "/api/expenses",
             get(expenses::list_expenses).post(expenses::create_expense),

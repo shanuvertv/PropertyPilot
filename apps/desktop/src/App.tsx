@@ -26,6 +26,7 @@ import { UnitPage } from "@/pages/units/UnitPage";
 import { ExpensesPage } from "@/pages/expenses/ExpensesPage";
 import { ExpenseDetailPage } from "@/pages/expenses/ExpenseDetailPage";
 import { ImportPage } from "@/pages/ImportPage";
+import { ChequesPage } from "@/pages/cheques/ChequesPage";
 
 function Loading() {
   return (
@@ -86,6 +87,7 @@ export default function App() {
             <Route path="/tenants/:id" element={<Guarded path="/tenants"><TenantDetailPage /></Guarded>} />
             <Route path="/contracts" element={<Guarded path="/contracts"><ContractsPage /></Guarded>} />
             <Route path="/contracts/:id" element={<Guarded path="/contracts"><ContractDetailPage /></Guarded>} />
+            <Route path="/cheques" element={<Guarded path="/cheques"><ChequesPage /></Guarded>} />
             <Route path="/renewals" element={<Guarded path="/renewals"><RenewalsPage /></Guarded>} />
             <Route path="/renewals/:id" element={<Guarded path="/renewals"><RenewalCasePage /></Guarded>} />
             <Route path="/follow-ups" element={<Guarded path="/follow-ups"><FollowUpsPage /></Guarded>} />

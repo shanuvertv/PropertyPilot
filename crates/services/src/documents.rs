@@ -23,6 +23,7 @@ fn caps(entity_type: &str) -> ServiceResult<(Capability, Capability)> {
         "contract" => (Capability::ViewContracts, Capability::ManageContracts),
         "notice" => (Capability::ViewRenewals, Capability::SendNotices),
         "expense" => (Capability::ViewExpenses, Capability::ManageExpenses),
+        "cheque" => (Capability::ViewContracts, Capability::ManageContracts),
         _ => return Err(ServiceError::validation("unknown document entity type")),
     })
 }
@@ -38,6 +39,7 @@ async fn parent_exists(pool: &PgPool, entity_type: &str, entity_id: Uuid) -> Ser
         "contract" => contracts::find(pool, entity_id).await?.is_some(),
         "notice" => true, // notices arrive in Phase 5
         "expense" => expenses::find(pool, entity_id).await?.is_some(),
+        "cheque" => renewal_db::cheques::find(pool, entity_id).await?.is_some(),
         _ => false,
     })
 }

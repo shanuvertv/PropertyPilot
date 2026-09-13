@@ -6,6 +6,7 @@ pub mod audit;
 pub mod audit_log;
 pub mod auth;
 pub mod buildings;
+pub mod cheques;
 pub mod contracts;
 pub mod dashboard;
 pub mod documents;

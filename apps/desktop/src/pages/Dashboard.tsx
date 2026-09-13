@@ -14,7 +14,8 @@ import { useApp } from "@/lib/app-state";
 import { matchesQuery } from "@/lib/local-filter";
 import { SearchBox } from "@/components/SearchBox";
 import { BAND_LABEL } from "@/lib/bands";
-import { BAND_ORDER, formatDate, formatDateTime } from "@/lib/format";
+import { BAND_ORDER, formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { chequeColumns } from "@/pages/cheques/ChequeParts";
 
 function Stat({ label, value, to }: { label: string; value: number | undefined; to?: string }) {
   const body = (
@@ -35,6 +36,14 @@ export function DashboardPage() {
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: () => api.dashboard(), refetchInterval: 60_000 });
   const c = dash.data?.counts;
   const bandCount = (b: string) => dash.data?.bands.find((x) => x.band === b)?.count ?? 0;
+  const canCheques = can("VIEW_CONTRACTS");
+  const chequeSummary = useQuery({ queryKey: ["cheques", "summary"], queryFn: () => api.chequeSummary(), enabled: canCheques, refetchInterval: 60_000 });
+  const chequesDue = useQuery({
+    queryKey: ["cheques", "dashboard"],
+    queryFn: () => api.cheques({ status: "PENDING", dueTo: isoDaysFromNow(30), sort: "due_date", pageSize: 8 }),
+    enabled: canCheques,
+    refetchInterval: 60_000,
+  });
 
   const contractCols = (action: (c: Contract) => React.ReactNode): Column<Contract>[] => [
     { key: "tenant", header: "Tenant", card: "title", render: (x) => <span className="font-medium">{x.tenantName}</span> },
@@ -139,6 +148,40 @@ export function DashboardPage() {
         "expiry-h",
       )}
 
+      {canCheques &&
+        section(
+          "Cheques to deposit",
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Stat label="Overdue" value={chequeSummary.data?.overdueCount} to="/cheques?scope=overdue" />
+              <Stat label="Due in 7 days" value={chequeSummary.data?.due7Count} to="/cheques?scope=week" />
+              <Stat label="Due in 30 days" value={chequeSummary.data?.due30Count} to="/cheques?scope=month" />
+              <Card className="h-full gap-1 py-4">
+                <CardContent className="px-4">
+                  <div className="text-[12.5px] text-muted-foreground">Pending in total</div>
+                  <div className="mt-1 text-[20px] font-semibold tracking-tight tabular-nums">{chequeSummary.data ? formatMoney(chequeSummary.data.pendingAmount) : "—"}</div>
+                  <div className="text-[12px] text-muted-foreground">{chequeSummary.data ? `${chequeSummary.data.pendingCount} cheque${chequeSummary.data.pendingCount === 1 ? "" : "s"}` : ""}</div>
+                </CardContent>
+              </Card>
+            </div>
+            <DataTable
+              view={view}
+              columns={chequeColumns({ manage: can("MANAGE_CONTRACTS"), showContract: true })}
+              rows={chequesDue.data?.items}
+              rowKey={(x) => x.id}
+              loading={chequesDue.isPending}
+              empty="No cheques due in the next 30 days."
+              onRowClick={(x) => navigate(`/contracts/${x.contractId}?tab=cheques`)}
+            />
+            {chequesDue.data && chequesDue.data.total > chequesDue.data.items.length && (
+              <Link to="/cheques?scope=month" className="text-[13px] text-primary hover:underline">
+                All {chequesDue.data.total} cheques due in the next 30 days →
+              </Link>
+            )}
+          </div>,
+          "cheques-h",
+        )}
+
       <div className="mb-4 flex items-center gap-2">
         <SearchBox value={quick} onChange={setQuick} placeholder="Filter the lists below by tenant, building or unit" />
         <ViewToggle value={view} onChange={setView} className="ml-auto" />
@@ -154,4 +197,10 @@ export function DashboardPage() {
       )}
     </>
   );
+}
+
+function isoDaysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }

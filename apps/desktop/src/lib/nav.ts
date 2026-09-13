@@ -1,4 +1,5 @@
 import {
+  Banknote,
   Bell,
   Building2,
   CalendarClock,
@@ -35,6 +36,7 @@ export const NAV: NavItem[] = [
   { to: "/units", label: "Units", icon: DoorOpen, requires: "VIEW_UNITS", phase: 1 },
   { to: "/tenants", label: "Tenants", icon: Users, requires: "VIEW_TENANTS", phase: 1 },
   { to: "/contracts", label: "Contracts", icon: FileText, requires: "VIEW_CONTRACTS", phase: 2 },
+  { to: "/cheques", label: "Cheques", icon: Banknote, requires: "VIEW_CONTRACTS", phase: 10 },
   { to: "/renewals", label: "Renewals", icon: CalendarClock, requires: "VIEW_RENEWALS", phase: 4 },
   { to: "/notices", label: "Renewal Notices", short: "Notices", icon: MailCheck, requires: "VIEW_RENEWALS", phase: 5 },
   { to: "/follow-ups", label: "Follow-Ups", icon: ClipboardCheck, requires: "VIEW_FOLLOW_UPS", phase: 4 },

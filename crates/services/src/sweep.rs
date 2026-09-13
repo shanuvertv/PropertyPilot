@@ -25,6 +25,7 @@ pub struct SweepSummary {
     pub follow_up_alerts: usize,
     pub notice_alerts: usize,
     pub response_alerts: usize,
+    pub cheque_alerts: usize,
 }
 
 fn fmt_date(d: NaiveDate) -> String {
@@ -310,6 +311,9 @@ pub async fn run(pool: &PgPool, actor: Option<&crate::Session>) -> ServiceResult
             .await?;
         }
     }
+
+    // Rent cheques: N days before the cheque date, on the day, and once when overdue.
+    summary.cheque_alerts = crate::cheques::send_reminders(pool, today, &admins).await?;
 
     renewal_db::worker_status::record_sweep(
         pool,

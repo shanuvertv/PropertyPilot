@@ -13,6 +13,7 @@ pub use sqlx::{PgConnection, PgPool};
 pub mod audit;
 pub mod automation;
 pub mod buildings;
+pub mod cheques;
 pub mod contracts;
 pub mod dashboard;
 pub mod documents;
@@ -81,7 +82,7 @@ pub async fn reset_business_data(pool: &PgPool) -> DbResult<()> {
     sqlx::query(
         "TRUNCATE TABLE notifications, reminder_dispatches, expenses, email_attachments, renewal_notices,
                         email_messages, follow_ups, renewal_responses, renewal_checklist_items, renewal_cases,
-                        documents, document_blobs, contract_units, contracts, units, buildings, tenants",
+                        documents, document_blobs, cheques, contract_units, contracts, units, buildings, tenants",
     )
     .execute(pool)
     .await

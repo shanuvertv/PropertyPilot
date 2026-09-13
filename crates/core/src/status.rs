@@ -345,6 +345,11 @@ status_enum! {
 }
 
 status_enum! {
+    /// A rent cheque's life: written → deposited → cleared, or bounced / cancelled.
+    ChequeStatus { Pending, Deposited, Cleared, Bounced, Cancelled }
+}
+
+status_enum! {
     /// How a unit's expense is divided between the people living there.
     /// `None` = a unit-level cost, `Equal` = split evenly between `split_count` people.
     SplitMethod { None, Equal }

@@ -166,6 +166,7 @@ export function OrganisationCard() {
           <TextField id="org-soon" label="Expiring soon (days)" type="number" value={String(form.thresholds.expiringSoonDays)} onChange={(v) => set({ thresholds: { ...form.thresholds, expiringSoonDays: Number(v) } })} hint="Contracts within this window show on the Renewal Dashboard." />
           <TextField id="org-urgent" label="Urgent (days)" type="number" value={String(form.thresholds.urgentDays)} onChange={(v) => set({ thresholds: { ...form.thresholds, urgentDays: Number(v) } })} />
           <TextField id="org-window" label="Completed renewals window (days)" type="number" value={String(form.completedWindowDays)} onChange={(v) => set({ completedWindowDays: Number(v) })} hint="Period for the dashboard card." />
+          <TextField id="org-cheque-days" label="Cheque deposit reminder (days before)" type="number" value={String(form.chequeReminderDays)} onChange={(v) => set({ chequeReminderDays: Number(v) })} hint="The assigned employee is reminded this many days before each cheque date, again on the day, and once if it goes overdue." />
           <Field label="Renewal cases">
             <label className="flex items-center gap-2 pt-1.5 text-[13px]">
               <Checkbox checked={form.autoOpenCase} onCheckedChange={(c) => set({ autoOpenCase: c === true })} />

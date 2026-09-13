@@ -549,6 +549,7 @@ pub fn sweep_summary(s: &renewal_services::sweep::SweepSummary) -> SweepSummaryD
         follow_up_alerts: s.follow_up_alerts as i64,
         notice_alerts: s.notice_alerts as i64,
         response_alerts: s.response_alerts as i64,
+        cheque_alerts: s.cheque_alerts as i64,
     }
 }
 
@@ -705,5 +706,60 @@ fn group_point(g: renewal_db::expenses::GroupTotal) -> GroupPoint {
         sublabel: g.sublabel,
         amount: money(g.amount_minor),
         expense_count: g.expense_count,
+    }
+}
+
+// ---------------------------------------------------------------- cheques
+
+pub fn cheque(c: renewal_db::cheques::ChequeRow) -> Cheque {
+    Cheque {
+        id: c.id.to_string(),
+        contract_id: c.contract_id.to_string(),
+        contract_number: c.contract_number,
+        contract_status: c.contract_status,
+        tenant_id: c.tenant_id.to_string(),
+        tenant_name: c.tenant_name,
+        building_id: c.building_id.to_string(),
+        building_name: c.building_name,
+        unit_numbers: c.unit_numbers,
+        seq: i64::from(c.seq),
+        cheque_number: c.cheque_number,
+        bank_name: c.bank_name,
+        amount: money(c.amount_minor),
+        due_date: d(c.due_date),
+        status: c.status,
+        status_changed_at: ts_opt(c.status_changed_at),
+        notes: c.notes,
+        days_until_due: i64::from(c.days_until_due),
+        created_at: ts(c.created_at),
+        updated_at: ts(c.updated_at),
+    }
+}
+
+pub fn cheque_input(i: &ChequeInput) -> Result<renewal_db::cheques::ChequeInput, ApiFailure> {
+    Ok(renewal_db::cheques::ChequeInput {
+        cheque_number: i.cheque_number.clone(),
+        bank_name: i.bank_name.clone(),
+        amount_minor: minor(i.amount, "amount")?,
+        due_date: date(&i.due_date, "cheque date")?,
+        notes: i.notes.clone(),
+    })
+}
+
+pub fn cheque_summary(
+    s: renewal_db::cheques::ChequeSummaryRow,
+    reminder_days: i64,
+) -> ChequeSummary {
+    ChequeSummary {
+        overdue_count: s.overdue_count,
+        overdue_amount: money(s.overdue_minor),
+        due_7_count: s.due_7_count,
+        due_7_amount: money(s.due_7_minor),
+        due_30_count: s.due_30_count,
+        due_30_amount: money(s.due_30_minor),
+        pending_count: s.pending_count,
+        pending_amount: money(s.pending_minor),
+        bounced_count: s.bounced_count,
+        reminder_days,
     }
 }

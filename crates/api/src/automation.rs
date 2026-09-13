@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Notification {
     pub id: String,
+    /// CHEQUE_DUE | CHEQUE_OVERDUE |
     /// CONTRACT_EXPIRING_SOON | RENEWAL_NOTICE_PENDING | TENANT_RESPONSE_PENDING | FOLLOW_UP_DUE_TODAY |
     /// OVERDUE_FOLLOW_UP | CONTRACT_EXPIRED | RENEWAL_REMINDER | RENEWAL_COMPLETED | CASE_ASSIGNED
     pub kind: String,
@@ -60,7 +61,14 @@ pub struct OrgSettingsDto {
     pub thresholds: Thresholds,
     pub auto_open_case: bool,
     pub completed_window_days: i32,
+    /// Days before a rent cheque's date to remind about the deposit (0 = only on the day).
+    #[serde(default = "default_cheque_reminder_days")]
+    pub cheque_reminder_days: i32,
     pub letterhead: LetterheadDto,
+}
+
+fn default_cheque_reminder_days() -> i32 {
+    3
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +85,8 @@ pub struct SweepSummaryDto {
     pub follow_up_alerts: i64,
     pub notice_alerts: i64,
     pub response_alerts: i64,
+    #[serde(default)]
+    pub cheque_alerts: i64,
 }
 
 /// Spec §19: user, date/time, action, previous value, new value.

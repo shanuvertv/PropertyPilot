@@ -6,6 +6,7 @@
 //!
 //! See `PLAN.md` §3 (spec clarifications) and §6 (core logic).
 
+pub mod cheques;
 pub mod error;
 pub mod expiry;
 pub mod roles;
@@ -13,13 +14,14 @@ pub mod split;
 pub mod status;
 pub mod sweep;
 
+pub use cheques::{add_months, plan_cheques, spacing_months, PlannedCheque};
 pub use error::{PermissionDenied, TransitionError};
 pub use expiry::{remaining_days, Band, Overlay, Thresholds};
 pub use roles::{Capability, Role};
 pub use split::{equal_split, format_minor, settled_amount};
 pub use status::{
-    ContractStatus, EmailStatus, ExpenseCategory, FollowUpStatus, FollowUpType, NoticeStatus,
-    RenewalStatus, ReportBucket, SplitMethod, TenantResponse, UnitStatus,
+    ChequeStatus, ContractStatus, EmailStatus, ExpenseCategory, FollowUpStatus, FollowUpType,
+    NoticeStatus, RenewalStatus, ReportBucket, SplitMethod, TenantResponse, UnitStatus,
 };
 pub use sweep::{
     plan as plan_sweep, Action as SweepAction, ReminderRule, SweepContract, SweepInput,

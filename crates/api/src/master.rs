@@ -241,6 +241,7 @@ pub enum DocumentEntity {
     Contract,
     Notice,
     Expense,
+    Cheque,
 }
 
 impl DocumentEntity {
@@ -251,6 +252,7 @@ impl DocumentEntity {
             DocumentEntity::Contract => "contract",
             DocumentEntity::Notice => "notice",
             DocumentEntity::Expense => "expense",
+            DocumentEntity::Cheque => "cheque",
         }
     }
     pub fn parse(s: &str) -> Option<DocumentEntity> {
@@ -259,6 +261,8 @@ impl DocumentEntity {
             "tenant" => Some(DocumentEntity::Tenant),
             "contract" => Some(DocumentEntity::Contract),
             "notice" => Some(DocumentEntity::Notice),
+            "expense" => Some(DocumentEntity::Expense),
+            "cheque" => Some(DocumentEntity::Cheque),
             _ => None,
         }
     }

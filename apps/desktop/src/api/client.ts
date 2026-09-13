@@ -78,6 +78,12 @@ import type {
   ExpenseListParams,
   ExpenseSummary,
   ExpenseSummaryParams,
+  Cheque,
+  ChequeInput,
+  ChequeListParams,
+  ChequeStatus,
+  ChequeSummary,
+  GenerateChequesRequest,
 } from "./types-domain";
 
 /** Thrown for any non-2xx response, or when the server cannot be reached at all. */
@@ -516,6 +522,32 @@ export class ApiClient {
   }
   expenseSummary(p: ExpenseSummaryParams) {
     return this.request<ExpenseSummary>("GET", `/api/expenses/summary${qs(p)}`);
+  }
+
+  // ---- rent cheques
+  cheques(p: ChequeListParams) {
+    return this.request<Page<Cheque>>("GET", `/api/cheques${qs(p)}`);
+  }
+  chequeSummary() {
+    return this.request<ChequeSummary>("GET", "/api/cheques/summary");
+  }
+  contractCheques(contractId: string) {
+    return this.request<Cheque[]>("GET", `/api/contracts/${contractId}/cheques`);
+  }
+  createCheque(contractId: string, input: ChequeInput) {
+    return this.request<Cheque>("POST", `/api/contracts/${contractId}/cheques`, input);
+  }
+  generateCheques(contractId: string, req: GenerateChequesRequest) {
+    return this.request<Cheque[]>("POST", `/api/contracts/${contractId}/cheques/generate`, req);
+  }
+  updateCheque(id: string, input: ChequeInput) {
+    return this.request<Cheque>("PUT", `/api/cheques/${id}`, input);
+  }
+  setChequeStatus(id: string, status: ChequeStatus) {
+    return this.request<Cheque>("PUT", `/api/cheques/${id}/status`, { status });
+  }
+  deleteCheque(id: string) {
+    return this.request<void>("DELETE", `/api/cheques/${id}`);
   }
 
   // ---- passwords

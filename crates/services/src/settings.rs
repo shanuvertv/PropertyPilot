@@ -19,6 +19,8 @@ pub struct OrgSettings {
     pub thresholds: Thresholds,
     pub auto_open_case: bool,
     pub completed_window_days: i32,
+    /// Days before a rent cheque's date to remind about the deposit (0 = only on the day).
+    pub cheque_reminder_days: i32,
     pub letterhead: Letterhead,
 }
 
@@ -39,6 +41,9 @@ pub async fn org(pool: &PgPool) -> ServiceResult<OrgSettings> {
         completed_window_days: settings::get(pool, "dashboard.completedWindowDays")
             .await?
             .unwrap_or(90),
+        cheque_reminder_days: settings::get(pool, crate::cheques::REMINDER_DAYS_KEY)
+            .await?
+            .unwrap_or(3),
         letterhead: settings::get(pool, "org.letterhead")
             .await?
             .unwrap_or_default(),
@@ -65,6 +70,11 @@ pub async fn save_org(
             "the completed-renewals window must be between 7 and 365 days",
         ));
     }
+    if !(0..=60).contains(&input.cheque_reminder_days) {
+        return Err(ServiceError::validation(
+            "the cheque reminder must be between 0 and 60 days before",
+        ));
+    }
     let before = org(pool).await?;
     let mut tx = pool.begin().await?;
     let by = Some(caller.user_id);
@@ -72,6 +82,13 @@ pub async fn save_org(
     settings::set(&mut *tx, settings::ORG_TIMEZONE, &input.timezone.trim(), by).await?;
     settings::set(&mut *tx, settings::EXPIRY_THRESHOLDS, &input.thresholds, by).await?;
     settings::set(&mut *tx, "renewals.autoOpenCase", &input.auto_open_case, by).await?;
+    settings::set(
+        &mut *tx,
+        crate::cheques::REMINDER_DAYS_KEY,
+        &input.cheque_reminder_days,
+        by,
+    )
+    .await?;
     settings::set(
         &mut *tx,
         "dashboard.completedWindowDays",
