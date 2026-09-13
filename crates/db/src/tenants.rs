@@ -50,7 +50,19 @@ const SORTS: &[(&str, &str)] = &[
     ("created_at", "t.created_at"),
 ];
 
-pub async fn list(pool: &PgPool, q: &ListQuery) -> DbResult<PageResult<TenantRow>> {
+#[derive(Debug, Clone, Default)]
+pub struct TenantFilter {
+    /// Tenants holding an active contract in this building.
+    pub building_id: Option<Uuid>,
+    /// `Some(true)` = with an active contract, `Some(false)` = without one.
+    pub active: Option<bool>,
+}
+
+pub async fn list(
+    pool: &PgPool,
+    f: &TenantFilter,
+    q: &ListQuery,
+) -> DbResult<PageResult<TenantRow>> {
     let like = q.like();
     let mut qb: QueryBuilder<Postgres> = QueryBuilder::new(SELECT.replacen(
         "SELECT ",
@@ -58,6 +70,19 @@ pub async fn list(pool: &PgPool, q: &ListQuery) -> DbResult<PageResult<TenantRow
         1,
     ));
     qb.push(" WHERE t.archived_at IS NULL");
+    if let Some(b) = f.building_id {
+        qb.push(" AND EXISTS (SELECT 1 FROM contracts c WHERE c.tenant_id = t.id AND c.status = 'ACTIVE' AND c.building_id = ")
+            .push_bind(b)
+            .push(")");
+    }
+    if let Some(active) = f.active {
+        qb.push(if active {
+            " AND EXISTS"
+        } else {
+            " AND NOT EXISTS"
+        })
+        .push(" (SELECT 1 FROM contracts c WHERE c.tenant_id = t.id AND c.status = 'ACTIVE')");
+    }
     if let Some(p) = &like {
         qb.push(" AND (t.name ILIKE ")
             .push_bind(p.clone())

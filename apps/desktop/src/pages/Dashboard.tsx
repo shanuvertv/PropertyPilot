@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 
@@ -10,6 +11,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/lib/app-state";
+import { matchesQuery } from "@/lib/local-filter";
+import { SearchBox } from "@/components/SearchBox";
 import { BAND_LABEL } from "@/lib/bands";
 import { BAND_ORDER, formatDate, formatDateTime } from "@/lib/format";
 
@@ -67,6 +70,10 @@ export function DashboardPage() {
     { key: "by", header: "Assigned", render: (x) => x.assignedEmployeeName ?? "—" },
   ];
 
+  const [quick, setQuick] = useState("");
+  const pick = (x: { tenantName?: string | null; buildingName?: string | null; unitNumbers?: string | null }) => [x.tenantName, x.buildingName, x.unitNumbers];
+  const f = <T extends { tenantName?: string | null; buildingName?: string | null; unitNumbers?: string | null }>(rows: T[] | undefined) =>
+    rows && quick.trim() ? rows.filter((r) => matchesQuery(quick, pick(r))) : rows;
   const section = (title: string, node: React.ReactNode, id: string) => (
     <section aria-labelledby={id} className="mb-8">
       <h2 id={id} className="mb-3 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
@@ -131,13 +138,16 @@ export function DashboardPage() {
         "expiry-h",
       )}
 
-      {section("Urgent renewals", <DataTable columns={contractCols(openOrStart)} rows={dash.data?.urgentRenewals} rowKey={(x) => x.id} empty="No urgent renewals." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "urgent-h")}
-      {section("Upcoming contract expiries", <DataTable columns={contractCols(openOrStart)} rows={dash.data?.upcomingExpiries} rowKey={(x) => x.id} empty="No other contracts expiring soon." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "upcoming-h")}
+      <div className="mb-4">
+        <SearchBox value={quick} onChange={setQuick} placeholder="Filter the lists below by tenant, building or unit" />
+      </div>
+      {section("Urgent renewals", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.urgentRenewals)} rowKey={(x) => x.id} empty="No urgent renewals." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "urgent-h")}
+      {section("Upcoming contract expiries", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.upcomingExpiries)} rowKey={(x) => x.id} empty="No other contracts expiring soon." onRowClick={(x) => navigate(x.caseId ? `/renewals/${x.caseId}` : `/contracts/${x.id}`)} />, "upcoming-h")}
       {can("VIEW_RENEWALS") && (
         <>
-          {section("Pending tenant responses", <DataTable columns={contractCols(openOrStart)} rows={dash.data?.pendingTenantResponses} rowKey={(x) => x.id} empty="No responses pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "responses-h")}
-          {section("Renewal notices pending", <DataTable columns={contractCols(openOrStart)} rows={dash.data?.noticesPending} rowKey={(x) => x.id} empty="No notices pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "notices-h")}
-          {section("Recently completed renewals", <DataTable columns={completedCols} rows={dash.data?.recentlyCompleted} rowKey={(x) => x.id} empty="No renewals completed in this period." onRowClick={(x) => navigate(`/renewals/${x.id}`)} />, "completed-h")}
+          {section("Pending tenant responses", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.pendingTenantResponses)} rowKey={(x) => x.id} empty="No responses pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "responses-h")}
+          {section("Renewal notices pending", <DataTable columns={contractCols(openOrStart)} rows={f(dash.data?.noticesPending)} rowKey={(x) => x.id} empty="No notices pending." onRowClick={(x) => navigate(`/renewals/${x.caseId}`)} />, "notices-h")}
+          {section("Recently completed renewals", <DataTable columns={completedCols} rows={f(dash.data?.recentlyCompleted)} rowKey={(x) => x.id} empty="No renewals completed in this period." onRowClick={(x) => navigate(`/renewals/${x.id}`)} />, "completed-h")}
         </>
       )}
     </>

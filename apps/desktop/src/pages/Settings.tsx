@@ -19,7 +19,9 @@ import { AuditCard } from "@/pages/settings/AuditCard";
 import { ImportCard } from "@/pages/settings/ImportCard";
 import { MailSettingsCard } from "@/pages/settings/MailSettingsCard";
 import { ResetPasswordDialog } from "@/components/PasswordDialogs";
-import { FormDialog } from "@/components/forms";
+import { FormDialog, selectClass } from "@/components/forms";
+import { SearchBox } from "@/components/SearchBox";
+import { useLocalFilter } from "@/lib/local-filter";
 
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -32,6 +34,8 @@ export function SettingsPage() {
   const queryClient = useQueryClient();
 
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.listUsers() });
+  const userFilter = useLocalFilter(users.data, (u) => [u.name, u.email, ROLE_LABEL[u.role], u.active ? "active" : "inactive"]);
+  const [roleFilter, setRoleFilter] = useState("");
   const system = useQuery({ queryKey: ["system-status"], queryFn: () => api.systemStatus(), refetchInterval: 30_000 });
 
   const [form, setForm] = useState({ name: "", email: "", role: "LEASING" as Role, password: "" });
@@ -80,6 +84,15 @@ export function SettingsPage() {
                   </AlertDescription>
                 </Alert>
               )}
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <SearchBox value={userFilter.q} onChange={userFilter.setQ} placeholder="Search name or email" />
+                <select className={`${selectClass} w-auto`} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} aria-label="Role">
+                  <option value="">All roles</option>
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                  ))}
+                </select>
+              </div>
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
@@ -93,7 +106,7 @@ export function SettingsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(users.data ?? []).map((u) => (
+                    {(userFilter.filtered ?? []).filter((u) => !roleFilter || u.role === roleFilter).map((u) => (
                       <TableRow key={u.id}>
                         <TableCell className="font-medium">{u.name}</TableCell>
                         <TableCell className="text-muted-foreground">{u.email}</TableCell>

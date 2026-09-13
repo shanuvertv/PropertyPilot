@@ -190,10 +190,14 @@ pub async fn archive_unit(
 pub async fn list_tenants(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,
-    Query(p): Query<ListParams>,
+    Query(p): Query<TenantListParams>,
 ) -> Result<Json<Page<Tenant>>, ApiFailure> {
-    let q = list_query(&p);
-    let res = tenants::list(&state.pool, &caller, &q).await?;
+    let q = list_query(&p.list());
+    let f = renewal_db::tenants::TenantFilter {
+        building_id: dto::uuid_opt(&p.building_id, "building")?,
+        active: p.active,
+    };
+    let res = tenants::list(&state.pool, &caller, &f, &q).await?;
     Ok(Json(dto::page(res, q.page, q.page_size, dto::tenant)))
 }
 

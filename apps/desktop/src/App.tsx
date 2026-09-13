@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from "react-router";
 
 import { Shell } from "@/components/Shell";
 import { useApp } from "@/lib/app-state";
-import { NAV } from "@/lib/nav";
+import { homeFor, NAV } from "@/lib/nav";
 import { BootstrapPage } from "@/pages/Bootstrap";
 import { BuildingDetailPage } from "@/pages/buildings/BuildingDetailPage";
 import { BuildingsPage } from "@/pages/buildings/BuildingsPage";
@@ -34,12 +34,28 @@ function Loading() {
   );
 }
 
-/** Route guard: a screen the role may not open bounces to the dashboard. */
+/** Route guard: a screen the role may not open bounces to the home screen. */
 function Guarded({ path, children }: { path: string; children: React.ReactNode }) {
   const { can } = useApp();
   const item = NAV.find((n) => n.to === path);
   if (item && !can(item.requires)) return <Navigate to="/" replace />;
   return <>{children}</>;
+}
+
+/**
+ * Where "/" lands: the dashboard for roles that may see it, otherwise the first
+ * module the role can use (Operations opens on Units instead of a forbidden dashboard).
+ */
+function Home() {
+  const { can } = useApp();
+  if (can("VIEW_DASHBOARD")) return <DashboardPage />;
+  const first = homeFor(can);
+  if (first) return <Navigate to={first.to} replace />;
+  return (
+    <p className="text-[13px] text-muted-foreground" role="status">
+      Your role has no screens enabled yet. Ask an administrator to update your access.
+    </p>
+  );
 }
 
 export default function App() {
@@ -58,7 +74,7 @@ export default function App() {
       return (
         <Routes>
           <Route element={<Shell />}>
-            <Route index element={<DashboardPage />} />
+            <Route index element={<Home />} />
             <Route path="/buildings" element={<Guarded path="/buildings"><BuildingsPage /></Guarded>} />
             <Route path="/buildings/:id" element={<Guarded path="/buildings"><BuildingDetailPage /></Guarded>} />
             <Route path="/units" element={<Guarded path="/units"><UnitsPage /></Guarded>} />

@@ -7,6 +7,8 @@ import type { Tenant } from "@/api/types-domain";
 import { DataTable, Paginator, type Column } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
+import { selectClass } from "@/components/forms";
+import { useBuildingOptions } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-state";
 import { useListParams } from "@/lib/list-params";
@@ -16,11 +18,21 @@ export function TenantsPage() {
   const { api, can } = useApp();
   const navigate = useNavigate();
   const { state, update, toggleSort } = useListParams({ sort: "name" });
+  const buildings = useBuildingOptions();
   const [dialog, setDialog] = useState(false);
 
   const query = useQuery({
     queryKey: ["tenants", "list", state],
-    queryFn: () => api.listTenants({ q: state.q, page: state.page, pageSize: state.pageSize, sort: state.sort, dir: state.dir }),
+    queryFn: () =>
+      api.listTenants({
+        q: state.q,
+        page: state.page,
+        pageSize: state.pageSize,
+        sort: state.sort,
+        dir: state.dir,
+        buildingId: state.filters.buildingId,
+        active: state.filters.active === "yes" ? true : state.filters.active === "no" ? false : undefined,
+      }),
     placeholderData: (prev) => prev,
   });
 
@@ -48,7 +60,18 @@ export function TenantsPage() {
         }
       />
       <div className="mb-3">
-        <SearchBox value={state.q} onChange={(q) => update({ q })} placeholder="Search name, contact, email or mobile" />
+        <SearchBox value={state.q} onChange={(q) => update({ q, page: 1 })} placeholder="Search name, contact, email or mobile" />
+        <select className={`${selectClass} w-auto`} value={state.filters.buildingId ?? ""} onChange={(e) => update({ page: 1, filters: { buildingId: e.target.value || undefined } })} aria-label="Building">
+          <option value="">All properties</option>
+          {(buildings.data ?? []).map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+        <select className={`${selectClass} w-auto`} value={state.filters.active ?? ""} onChange={(e) => update({ page: 1, filters: { active: e.target.value || undefined } })} aria-label="Contract status">
+          <option value="">Any status</option>
+          <option value="yes">With an active contract</option>
+          <option value="no">Without an active contract</option>
+        </select>
       </div>
       <DataTable
         columns={columns}

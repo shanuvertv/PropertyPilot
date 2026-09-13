@@ -64,6 +64,8 @@ pub async fn list(pool: &PgPool, q: &ListQuery) -> DbResult<PageResult<BuildingR
             .push_bind(p.clone())
             .push(" OR b.location ILIKE ")
             .push_bind(p.clone())
+            .push(" OR b.building_type ILIKE ")
+            .push_bind(p.clone())
             .push(")");
     }
     let total: i64 = count.build_query_scalar().fetch_one(pool).await?;
@@ -76,6 +78,8 @@ pub async fn list(pool: &PgPool, q: &ListQuery) -> DbResult<PageResult<BuildingR
             .push(" OR b.code ILIKE ")
             .push_bind(p.clone())
             .push(" OR b.location ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR b.building_type ILIKE ")
             .push_bind(p.clone())
             .push(")");
     }

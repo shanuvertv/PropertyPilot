@@ -425,6 +425,8 @@ pub fn search_hit(h: DbSearchHit) -> Option<SearchHit> {
         "unit" => SearchKind::Unit,
         "tenant" => SearchKind::Tenant,
         "contract" => SearchKind::Contract,
+        "occupant" => SearchKind::Occupant,
+        "expense" => SearchKind::Expense,
         _ => return None,
     };
     Some(SearchHit {

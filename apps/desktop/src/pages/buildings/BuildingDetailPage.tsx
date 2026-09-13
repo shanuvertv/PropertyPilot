@@ -16,7 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
-import { formatDate } from "@/lib/format";
+import { useLocalFilter } from "@/lib/local-filter";
+import { SearchBox } from "@/components/SearchBox";
+import { selectClass } from "@/components/forms";
+import { formatDate, UNIT_STATUS_LABEL, keys } from "@/lib/format";
 import { UnitDialog } from "@/pages/units/UnitDialog";
 import { BuildingDialog } from "./BuildingDialog";
 
@@ -41,6 +44,8 @@ export function BuildingDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const detail = useQuery({ queryKey: ["buildings", id], queryFn: () => api.getBuilding(id) });
+  const unitFilter = useLocalFilter(detail.data?.units, (u) => [u.unitNumber, u.tenantName, u.unitType, u.floor, u.status, u.contractNumber]);
+  const [unitStatus, setUnitStatus] = useState("");
   const b = detail.data?.building;
   const s = detail.data?.summary;
 
@@ -123,17 +128,26 @@ export function BuildingDetailPage() {
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
         <TabsContent value="units" className="pt-4">
-          {can("MANAGE_UNITS") && (
-            <div className="mb-3 flex justify-end">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchBox value={unitFilter.q} onChange={unitFilter.setQ} placeholder="Search unit, tenant, type or status" />
+              <select className={`${selectClass} w-auto`} value={unitStatus} onChange={(e) => setUnitStatus(e.target.value)} aria-label="Status">
+                <option value="">Any status</option>
+                {keys(UNIT_STATUS_LABEL).map((s) => (
+                  <option key={s} value={s}>{UNIT_STATUS_LABEL[s]}</option>
+                ))}
+              </select>
+            </div>
+            {can("MANAGE_UNITS") && (
               <Button size="sm" onClick={() => setUnitDialog({ open: true, unit: null })}>
                 <Plus data-icon="inline-start" />
                 Add unit
               </Button>
-            </div>
-          )}
+            )}
+          </div>
           <DataTable
             columns={unitColumns}
-            rows={detail.data?.units}
+            rows={unitFilter.filtered?.filter((u) => !unitStatus || u.status === unitStatus)}
             rowKey={(u) => u.id}
             empty="No units in this building yet."
             onRowClick={can("MANAGE_UNITS") ? (u) => setUnitDialog({ open: true, unit: u }) : undefined}

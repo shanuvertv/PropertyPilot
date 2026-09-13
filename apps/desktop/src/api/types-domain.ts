@@ -437,7 +437,7 @@ export interface Dashboard {
   completedWindowDays: number;
 }
 
-export type SearchKind = "building" | "unit" | "tenant" | "contract";
+export type SearchKind = "building" | "unit" | "tenant" | "contract" | "occupant" | "expense";
 
 export interface SearchHit {
   kind: SearchKind;

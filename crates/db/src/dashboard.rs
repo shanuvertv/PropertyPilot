@@ -89,7 +89,7 @@ pub struct SearchHit {
     pub subtitle: String,
 }
 
-/// Global search across buildings, units, tenants and contracts (top 5 each).
+/// Global search across buildings, units, tenants, contracts, occupants and expenses (top 5 each).
 pub async fn search<'e>(ex: impl PgExecutor<'e>, term: &str) -> DbResult<Vec<SearchHit>> {
     let like = format!("%{}%", term.replace('%', "\\%").replace('_', "\\_"));
     sqlx::query_as(
@@ -97,13 +97,24 @@ pub async fn search<'e>(ex: impl PgExecutor<'e>, term: &str) -> DbResult<Vec<Sea
            WHERE archived_at IS NULL AND (name ILIKE $1 OR code ILIKE $1 OR location ILIKE $1) ORDER BY name LIMIT 5)
          UNION ALL
          (SELECT 'unit', u.id, b.name || ' · ' || u.unit_number, initcap(lower(u.status)) FROM units u JOIN buildings b ON b.id = u.building_id
-           WHERE u.archived_at IS NULL AND u.unit_number ILIKE $1 ORDER BY b.name, u.unit_number LIMIT 5)
+           WHERE u.archived_at IS NULL AND (u.unit_number ILIKE $1 OR (b.name || ' ' || u.unit_number) ILIKE $1) ORDER BY b.name, u.unit_number LIMIT 5)
          UNION ALL
          (SELECT 'tenant', id, name, COALESCE(contact_person, '') FROM tenants
            WHERE archived_at IS NULL AND (name ILIKE $1 OR contact_person ILIKE $1 OR email ILIKE $1 OR mobile ILIKE $1) ORDER BY name LIMIT 5)
          UNION ALL
          (SELECT 'contract', c.id, c.contract_number, t.name FROM contracts c JOIN tenants t ON t.id = c.tenant_id
-           WHERE c.contract_number ILIKE $1 ORDER BY c.end_date DESC LIMIT 5)",
+           WHERE c.contract_number ILIKE $1 OR t.name ILIKE $1 ORDER BY c.end_date DESC LIMIT 5)
+         UNION ALL
+         (SELECT 'occupant', o.unit_id, o.full_name, b.name || ' · ' || u.unit_number || COALESCE(' · bed ' || o.bed_label, '')
+            FROM occupants o JOIN units u ON u.id = o.unit_id JOIN buildings b ON b.id = u.building_id
+           WHERE (o.move_out IS NULL OR o.move_out >= CURRENT_DATE)
+             AND (o.full_name ILIKE $1 OR o.id_number ILIKE $1 OR o.phone ILIKE $1 OR o.email ILIKE $1)
+           ORDER BY o.full_name LIMIT 5)
+         UNION ALL
+         (SELECT 'expense', x.id, x.description, b.name || ' · ' || u.unit_number || ' · ' || to_char(x.expense_date, 'DD Mon YYYY')
+            FROM expenses x JOIN units u ON u.id = x.unit_id JOIN buildings b ON b.id = u.building_id
+           WHERE x.description ILIKE $1 OR x.vendor ILIKE $1 OR x.reference ILIKE $1
+           ORDER BY x.expense_date DESC LIMIT 5)",
     )
     .bind(like)
     .fetch_all(ex)

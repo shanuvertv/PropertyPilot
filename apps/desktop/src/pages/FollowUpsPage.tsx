@@ -10,9 +10,13 @@ import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateRange } from "@/components/DateRange";
+import { SearchBox } from "@/components/SearchBox";
+import { selectClass } from "@/components/forms";
+import { useBuildingOptions, useEmployees } from "@/lib/queries";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
-import { FOLLOW_UP_TYPE_LABEL, formatDate } from "@/lib/format";
+import { FOLLOW_UP_TYPE_LABEL, formatDate, keys } from "@/lib/format";
 import { useListParams } from "@/lib/list-params";
 import { FollowUpDialog } from "@/pages/renewals/RenewalCasePage";
 import { cn } from "@/lib/utils";
@@ -25,6 +29,8 @@ export function FollowUpsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { state, update } = useListParams({ sort: "due_date" });
+  const buildings = useBuildingOptions();
+  const employees = useEmployees();
   const scope = (state.filters.scope as Scope | undefined) ?? "today";
   const mine = state.filters.mine === "true";
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +39,21 @@ export function FollowUpsPage() {
   const counts = useQuery({ queryKey: ["follow-ups", "counts", mine], queryFn: () => api.followUpCounts(mine) });
   const query = useQuery({
     queryKey: ["follow-ups", "list", state, scope, mine],
-    queryFn: () => api.listFollowUps({ q: state.q, page: state.page, pageSize: state.pageSize, sort: "due_date", dir: scope === "overdue" ? "desc" : "asc", scope, mine }),
+    queryFn: () =>
+      api.listFollowUps({
+        q: state.q,
+        page: state.page,
+        pageSize: state.pageSize,
+        sort: "due_date",
+        dir: scope === "overdue" ? "desc" : "asc",
+        scope,
+        mine,
+        followUpType: state.filters.type,
+        assignedEmployeeId: state.filters.assignedEmployeeId,
+        buildingId: state.filters.buildingId,
+        from: state.filters.from,
+        to: state.filters.to,
+      }),
     placeholderData: (prev) => prev,
   });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
@@ -102,6 +122,30 @@ export function FollowUpsPage() {
           <Checkbox checked={mine} onCheckedChange={(c) => update({ filters: { mine: c === true ? "true" : undefined } })} />
           Only mine
         </label>
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchBox value={state.q} onChange={(q) => update({ q, page: 1 })} placeholder="Search tenant, contract, unit, building or notes" />
+        <select className={`${selectClass} w-auto`} value={state.filters.type ?? ""} onChange={(e) => update({ page: 1, filters: { type: e.target.value || undefined } })} aria-label="Type">
+          <option value="">Any type</option>
+          {keys(FOLLOW_UP_TYPE_LABEL).map((t) => (
+            <option key={t} value={t}>{FOLLOW_UP_TYPE_LABEL[t]}</option>
+          ))}
+        </select>
+        <select className={`${selectClass} w-auto`} value={state.filters.buildingId ?? ""} onChange={(e) => update({ page: 1, filters: { buildingId: e.target.value || undefined } })} aria-label="Building">
+          <option value="">All properties</option>
+          {(buildings.data ?? []).map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+        {!mine && (
+          <select className={`${selectClass} w-auto`} value={state.filters.assignedEmployeeId ?? ""} onChange={(e) => update({ page: 1, filters: { assignedEmployeeId: e.target.value || undefined } })} aria-label="Assigned to">
+            <option value="">Anyone</option>
+            {(employees.data ?? []).map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        )}
+        <DateRange from={state.filters.from} to={state.filters.to} onChange={(from, to) => update({ page: 1, filters: { from, to } })} />
       </div>
       <DataTable
         columns={columns}

@@ -341,6 +341,11 @@ pub struct FollowUpListParams {
     /// `today` | `overdue` | `upcoming` | `open` (default) | `all`
     pub scope: Option<String>,
     pub mine: Option<bool>,
+    pub follow_up_type: Option<FollowUpType>,
+    pub assigned_employee_id: Option<String>,
+    pub building_id: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -401,6 +406,8 @@ pub enum SearchKind {
     Unit,
     Tenant,
     Contract,
+    Occupant,
+    Expense,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

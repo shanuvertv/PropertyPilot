@@ -24,6 +24,9 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
   private storage; works over the LAN or the internet (HTTPS)
 - Browser version: the server serves the same UI at `https://<server>/` (set `WEB_DIR` or put
   the `web/` build next to the executable) — no install needed
+- Search and filters on every list: `Ctrl+K` global search (buildings, units, tenants,
+  contracts, occupants, expenses), a search box plus building / status / type / date filters on
+  each page, and a quick filter on every detail-page table
 - Occupants per unit (shared accommodation): who lives where, move-in/out dates
 - Expenses per unit: bills and costs by category, split equally or by custom amounts between
   the occupants present on the bill date, per-person settlement, attached bills; dashboard

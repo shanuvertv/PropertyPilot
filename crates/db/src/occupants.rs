@@ -1,7 +1,9 @@
 //! Occupants: the people living in a unit (shared accommodation), with move-in/out dates.
 
 use chrono::{DateTime, NaiveDate, Utc};
-use sqlx::{FromRow, PgExecutor};
+use sqlx::{FromRow, PgExecutor, PgPool, Postgres, QueryBuilder, Row};
+
+use crate::paging::{ListQuery, PageResult};
 use uuid::Uuid;
 
 use crate::DbResult;
@@ -170,4 +172,81 @@ pub async fn count_current<'e>(ex: impl PgExecutor<'e>, unit_id: Uuid) -> DbResu
     .bind(unit_id)
     .fetch_one(ex)
     .await
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct OccupantFilter {
+    pub building_id: Option<Uuid>,
+    pub unit_id: Option<Uuid>,
+    pub tenant_id: Option<Uuid>,
+    /// `Some(true)` = living there today, `Some(false)` = moved out.
+    pub current: Option<bool>,
+}
+
+const SORTS: &[(&str, &str)] = &[
+    ("name", "o.full_name"),
+    ("unit", "b.name, u.unit_number, o.bed_label"),
+    ("move_in", "o.move_in"),
+    ("move_out", "o.move_out"),
+];
+
+/// Occupants across all units, searchable by name / ID / phone / email / unit / building.
+pub async fn search(
+    pool: &PgPool,
+    f: &OccupantFilter,
+    q: &ListQuery,
+) -> DbResult<PageResult<OccupantRow>> {
+    let mut qb: QueryBuilder<Postgres> = QueryBuilder::new(SELECT.replacen(
+        "SELECT ",
+        "SELECT count(*) OVER () AS total_count, ",
+        1,
+    ));
+    qb.push(" WHERE TRUE");
+    if let Some(b) = f.building_id {
+        qb.push(" AND u.building_id = ").push_bind(b);
+    }
+    if let Some(u) = f.unit_id {
+        qb.push(" AND o.unit_id = ").push_bind(u);
+    }
+    if let Some(t) = f.tenant_id {
+        qb.push(" AND o.tenant_id = ").push_bind(t);
+    }
+    match f.current {
+        Some(true) => {
+            qb.push(" AND (o.move_out IS NULL OR o.move_out >= CURRENT_DATE)");
+        }
+        Some(false) => {
+            qb.push(" AND o.move_out IS NOT NULL AND o.move_out < CURRENT_DATE");
+        }
+        None => {}
+    }
+    if let Some(p) = q.like() {
+        qb.push(" AND (o.full_name ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR o.id_number ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR o.phone ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR o.email ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR u.unit_number ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR b.name ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR t.name ILIKE ")
+            .push_bind(p)
+            .push(")");
+    }
+    qb.push(q.order_by(SORTS))
+        .push(" LIMIT ")
+        .push_bind(q.page_size)
+        .push(" OFFSET ")
+        .push_bind(q.offset());
+    let rows = qb.build().fetch_all(pool).await?;
+    let total: i64 = rows.first().map(|r| r.get("total_count")).unwrap_or(0);
+    let items = rows
+        .iter()
+        .map(OccupantRow::from_row)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(PageResult { items, total })
 }

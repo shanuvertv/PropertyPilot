@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Bell, CalendarClock, CheckCheck, Clock, Mail, MessageSquare, UserCheck, XCircle } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -6,6 +7,9 @@ import type { Notification, NotificationKind } from "@/api/types-domain";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-state";
+import { useLocalFilter } from "@/lib/local-filter";
+import { SearchBox } from "@/components/SearchBox";
+import { selectClass } from "@/components/forms";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +49,10 @@ export function NotificationsPage() {
   const markAll = useMutation({ mutationFn: () => api.markAllRead(), onSuccess: () => void invalidate() });
 
   const unread = list.data?.filter((n) => !n.readAt).length ?? 0;
+  const filter = useLocalFilter(list.data, (n) => [n.title, n.body, STYLE[n.kind]?.label]);
+  const [kind, setKind] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const shown = (filter.filtered ?? []).filter((n) => (!kind || n.kind === kind) && (!unreadOnly || !n.readAt));
 
   return (
     <>
@@ -60,9 +68,23 @@ export function NotificationsPage() {
           )
         }
       />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchBox value={filter.q} onChange={filter.setQ} placeholder="Search notifications" />
+        <select className={`${selectClass} w-auto`} value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Type">
+          <option value="">All types</option>
+          {(Object.keys(STYLE) as NotificationKind[]).map((k) => (
+            <option key={k} value={k}>{STYLE[k].label}</option>
+          ))}
+        </select>
+        <label className="flex items-center gap-2 text-[13px]">
+          <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} />
+          Unread only
+        </label>
+      </div>
       {list.data?.length === 0 && <p className="text-[13.5px] text-muted-foreground">Nothing yet. The daily sweep and your colleagues will fill this in.</p>}
+      {list.data && list.data.length > 0 && shown.length === 0 && <p className="text-[13.5px] text-muted-foreground">No notification matches the filters.</p>}
       <ul className="flex flex-col gap-1.5">
-        {list.data?.map((n) => {
+        {shown.map((n) => {
           const s = STYLE[n.kind] ?? STYLE.RENEWAL_REMINDER;
           const Icon = s.icon;
           return (

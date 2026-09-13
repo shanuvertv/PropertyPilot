@@ -7,7 +7,9 @@ import type { Expense, Occupant, OccupantInput } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
 import { HorizontalBars, MonthlyTrend, categoryColor } from "@/components/charts";
 import { DataTable, type Column } from "@/components/DataTable";
-import { errorMessage, FormDialog, TextAreaField, TextField } from "@/components/forms";
+import { errorMessage, FormDialog, selectClass, TextAreaField, TextField } from "@/components/forms";
+import { SearchBox } from "@/components/SearchBox";
+import { useLocalFilter } from "@/lib/local-filter";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
-import { EXPENSE_CATEGORY_LABEL, formatDate, formatMoney, formatMonth, todayIso } from "@/lib/format";
+import { EXPENSE_CATEGORY_LABEL, formatDate, formatMoney, formatMonth, keys, todayIso } from "@/lib/format";
 import { ExpenseDialog } from "@/pages/expenses/ExpenseDialog";
 import { SplitBadge } from "@/pages/expenses/ExpensesPage";
 import { UnitDialog } from "./UnitDialog";
@@ -66,7 +68,7 @@ export function UnitPage() {
           </div>
           <div>
             <div className="text-[12px] text-muted-foreground">Contract</div>
-            <div>{u.contractId ? <Link to={`/contracts/${u.contractId}`} className="text-primary hover:underline">{u.contractNumber}</Link> : "—"}</div>
+            <div>{u.contractId ? can("VIEW_CONTRACTS") ? <Link to={`/contracts/${u.contractId}`} className="text-primary hover:underline">{u.contractNumber}</Link> : u.contractNumber : "—"}</div>
           </div>
           <div>
             <div className="text-[12px] text-muted-foreground">Contract ends</div>
@@ -74,7 +76,7 @@ export function UnitPage() {
           </div>
           <div>
             <div className="text-[12px] text-muted-foreground">Renewal</div>
-            <div>{u.caseId ? <Link to={`/renewals/${u.caseId}`} className="hover:underline"><RenewalStatusBadge status={u.renewalStatus} /></Link> : <span className="text-muted-foreground">Not started</span>}</div>
+            <div>{u.caseId ? can("VIEW_RENEWALS") ? <Link to={`/renewals/${u.caseId}`} className="hover:underline"><RenewalStatusBadge status={u.renewalStatus} /></Link> : <RenewalStatusBadge status={u.renewalStatus} /> : <span className="text-muted-foreground">Not started</span>}</div>
           </div>
         </CardContent>
       </Card>
@@ -116,6 +118,7 @@ function OccupantsTab({ unitId }: { unitId: string }) {
   const [error, setError] = useState<string | null>(null);
   const manage = can("MANAGE_OCCUPANTS");
   const list = useQuery({ queryKey: ["occupants", unitId, showPast], queryFn: () => api.occupants(unitId, showPast) });
+  const filter = useLocalFilter(list.data, (o) => [o.fullName, o.bedLabel, o.tenantName, o.phone, o.idNumber, o.email]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["occupants", unitId] });
 
   const reactivate = useMutation({
@@ -158,7 +161,8 @@ function OccupantsTab({ unitId }: { unitId: string }) {
         <div className="text-[13px] text-muted-foreground">
           {current} living here now. Bills split equally go to the people present on the bill date.
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchBox value={filter.q} onChange={filter.setQ} placeholder="Search name, bed, phone or ID" className="max-w-[260px]" />
           <label className="flex items-center gap-2 text-[13px]">
             <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
             Show past occupants
@@ -176,7 +180,7 @@ function OccupantsTab({ unitId }: { unitId: string }) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <DataTable columns={columns} rows={list.data} rowKey={(o) => o.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load occupants.") : null} empty="Nobody is recorded in this unit yet." />
+      <DataTable columns={columns} rows={filter.filtered} rowKey={(o) => o.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load occupants.") : null} empty={filter.q ? "No occupant matches the search." : "Nobody is recorded in this unit yet."} />
 
       <OccupantDialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)} unitId={unitId} edit={dialog?.edit ?? null} onSaved={refresh} />
       <MoveOutDialog occupant={moveOut} onOpenChange={(o) => !o && setMoveOut(null)} onSaved={refresh} />
@@ -252,6 +256,8 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
   const [dialog, setDialog] = useState(false);
   const summary = useQuery({ queryKey: ["expenses", "summary", "unit", unit.id], queryFn: () => api.expenseSummary({ unitId: unit.id }) });
   const list = useQuery({ queryKey: ["expenses", "unit", unit.id], queryFn: () => api.expenses({ unitId: unit.id, pageSize: 100, sort: "expense_date", dir: "desc" }) });
+  const filter = useLocalFilter(list.data?.items, (e) => [e.description, EXPENSE_CATEGORY_LABEL[e.category], e.vendor, e.reference, e.expenseDate, e.amount]);
+  const [category, setCategory] = useState("");
   const monthly = useMemo(() => (summary.data?.monthly ?? []).map((m) => ({ label: formatMonth(m.month), amount: m.amount, count: m.expenseCount })), [summary.data]);
   const byCategory = useMemo(() => (summary.data?.byCategory ?? []).map((c) => ({ id: c.category, label: EXPENSE_CATEGORY_LABEL[c.category], amount: c.amount, count: c.expenseCount, color: categoryColor(c.category) })), [summary.data]);
 
@@ -280,8 +286,17 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
         </Card>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[13px] text-muted-foreground">
-          {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected from occupants.` : "All shares settled."}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchBox value={filter.q} onChange={filter.setQ} placeholder="Search description, vendor or reference" className="max-w-[280px]" />
+          <select className={`${selectClass} w-auto`} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
+            <option value="">All categories</option>
+            {keys(EXPENSE_CATEGORY_LABEL).map((c) => (
+              <option key={c} value={c}>{EXPENSE_CATEGORY_LABEL[c]}</option>
+            ))}
+          </select>
+          <span className="text-[12.5px] text-muted-foreground">
+            {summary.data && summary.data.outstanding > 0 ? `${formatMoney(summary.data.outstanding)} still to be collected.` : "All shares settled."}
+          </span>
         </div>
         {can("MANAGE_EXPENSES") && (
           <Button size="sm" onClick={() => setDialog(true)}>
@@ -290,7 +305,7 @@ function UnitExpensesTab({ unit }: { unit: { id: string; buildingId: string; lab
           </Button>
         )}
       </div>
-      <DataTable columns={columns} rows={list.data?.items} rowKey={(e) => e.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load expenses.") : null} empty="No expenses for this unit yet." onRowClick={(e) => navigate(`/expenses/${e.id}`)} />
+      <DataTable columns={columns} rows={filter.filtered?.filter((e) => !category || e.category === category)} rowKey={(e) => e.id} loading={list.isPending} error={list.isError ? errorMessage(list.error, "Could not load expenses.") : null} empty={filter.q || category ? "No expense matches the filters." : "No expenses for this unit yet."} onRowClick={(e) => navigate(`/expenses/${e.id}`)} />
       <ExpenseDialog
         open={dialog}
         onOpenChange={setDialog}

@@ -75,6 +75,10 @@ pub struct FollowUpFilter {
     pub scope: Option<Scope>,
     pub case_id: Option<Uuid>,
     pub assigned_employee_id: Option<Uuid>,
+    pub follow_up_type: Option<String>,
+    pub building_id: Option<Uuid>,
+    pub due_from: Option<chrono::NaiveDate>,
+    pub due_to: Option<chrono::NaiveDate>,
 }
 
 pub async fn list(
@@ -101,12 +105,30 @@ pub async fn list(
     if let Some(a) = f.assigned_employee_id {
         qb.push(" AND f.assigned_employee_id = ").push_bind(a);
     }
+    if let Some(t) = &f.follow_up_type {
+        qb.push(" AND f.follow_up_type = ").push_bind(t.clone());
+    }
+    if let Some(b) = f.building_id {
+        qb.push(" AND c.building_id = ").push_bind(b);
+    }
+    if let Some(d) = f.due_from {
+        qb.push(" AND f.due_date >= ").push_bind(d);
+    }
+    if let Some(d) = f.due_to {
+        qb.push(" AND f.due_date <= ").push_bind(d);
+    }
     if let Some(p) = q.like() {
         qb.push(" AND (t.name ILIKE ")
             .push_bind(p.clone())
             .push(" OR c.contract_number ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR f.notes ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR b.name ILIKE ")
+            .push_bind(p.clone())
+            .push(" OR EXISTS (SELECT 1 FROM contract_units cu JOIN units u ON u.id = cu.unit_id WHERE cu.contract_id = c.id AND u.unit_number ILIKE ")
             .push_bind(p)
-            .push(")");
+            .push("))");
     }
     qb.push(q.order_by(SORTS))
         .push(" LIMIT ")

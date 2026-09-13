@@ -47,6 +47,15 @@ export const NAV: NavItem[] = [
 /** Preferred order for the phone's bottom tabs; the first four the role can see are shown. */
 const PHONE_TAB_ORDER = ["/", "/units", "/renewals", "/follow-ups", "/contracts", "/tenants", "/buildings", "/reports"];
 
+/**
+ * Where "/" should land for a role that cannot see the dashboard: the most-used
+ * module it may open (Units for Operations), falling back to sidebar order.
+ */
+export function homeFor(can: (cap: Capability) => boolean): NavItem | undefined {
+  const allowed = NAV.filter((n) => n.to !== "/" && can(n.requires));
+  return PHONE_TAB_ORDER.map((to) => allowed.find((i) => i.to === to)).find((i) => i !== undefined) ?? allowed[0];
+}
+
 /** The bottom tabs for a role: up to four of the modules it may use, most-used first. */
 export function phoneTabs(visible: NavItem[]): NavItem[] {
   return PHONE_TAB_ORDER.map((to) => visible.find((i) => i.to === to))

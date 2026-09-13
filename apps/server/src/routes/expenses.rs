@@ -94,6 +94,47 @@ pub async fn delete_occupant(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OccupantSearchQuery {
+    pub q: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+    pub sort: Option<String>,
+    pub dir: Option<String>,
+    pub building_id: Option<String>,
+    pub unit_id: Option<String>,
+    pub tenant_id: Option<String>,
+    pub current: Option<bool>,
+}
+
+/// All occupants across units, searchable (People).
+pub async fn search_occupants(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Query(p): Query<OccupantSearchQuery>,
+) -> Result<Json<Page<Occupant>>, ApiFailure> {
+    let today = renewal_db::today(&state.pool).await?;
+    let f = renewal_db::occupants::OccupantFilter {
+        building_id: dto::uuid_opt(&p.building_id, "building")?,
+        unit_id: dto::uuid_opt(&p.unit_id, "unit")?,
+        tenant_id: dto::uuid_opt(&p.tenant_id, "tenant")?,
+        current: p.current,
+    };
+    let lp = ListParams {
+        q: p.q.clone(),
+        page: p.page,
+        page_size: p.page_size,
+        sort: p.sort.clone().or_else(|| Some("name".into())),
+        dir: p.dir.clone(),
+    };
+    let q = list_query(&lp);
+    let page = occupants::search(&state.pool, &caller, &f, &q).await?;
+    Ok(Json(dto::page(page, q.page, q.page_size, |o| {
+        dto::occupant(o, today)
+    })))
+}
+
 // ---------------------------------------------------------------- expenses
 
 #[derive(serde::Deserialize)]

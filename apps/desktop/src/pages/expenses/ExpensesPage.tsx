@@ -8,6 +8,7 @@ import { HorizontalBars, MonthlyTrend, categoryColor } from "@/components/charts
 import { DataTable, Paginator, type Column } from "@/components/DataTable";
 import { errorMessage, selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
+import { DateRange } from "@/components/DateRange";
 import { SearchBox } from "@/components/SearchBox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,7 @@ import { useListParams } from "@/lib/list-params";
 import { useBuildingOptions } from "@/lib/queries";
 import { ExpenseDialog } from "./ExpenseDialog";
 
-type Period = "12m" | "ytd" | "3m" | "all";
+type Period = "12m" | "ytd" | "3m" | "all" | "custom";
 
 function periodRange(p: Period): { from?: string; to?: string } {
   const now = new Date();
@@ -57,11 +58,17 @@ export function ExpensesPage() {
   const [dialog, setDialog] = useState(false);
   const period = (state.filters.period as Period | undefined) ?? "12m";
   const buildingId = state.filters.buildingId;
-  const range = periodRange(period);
+  const unitId = state.filters.unitId;
+  const range = period === "custom" ? { from: state.filters.from, to: state.filters.to } : periodRange(period);
+  const units = useQuery({
+    queryKey: ["units", "options", buildingId ?? ""],
+    queryFn: () => api.listUnits({ buildingId, pageSize: 200, sort: "unit_number" }),
+    enabled: !!buildingId,
+  });
 
   const summary = useQuery({
-    queryKey: ["expenses", "summary", buildingId ?? "", period],
-    queryFn: () => api.expenseSummary({ buildingId, ...range }),
+    queryKey: ["expenses", "summary", buildingId ?? "", unitId ?? "", period, range],
+    queryFn: () => api.expenseSummary({ buildingId, unitId, ...range }),
   });
   const list = useQuery({
     queryKey: ["expenses", "list", state, range],
@@ -73,6 +80,7 @@ export function ExpensesPage() {
         sort: state.sort,
         dir: state.dir,
         buildingId,
+        unitId,
         category: (state.filters.category as ExpenseCategory | undefined) ?? undefined,
         outstanding: state.filters.outstanding === "1" ? true : undefined,
         ...range,
@@ -118,12 +126,22 @@ export function ExpensesPage() {
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
         </select>
-        <select className={`${selectClass} w-auto`} value={period} onChange={(e) => update({ page: 1, filters: { period: e.target.value === "12m" ? undefined : e.target.value } })} aria-label="Period">
+        {buildingId && (
+          <select className={`${selectClass} w-auto min-w-36`} value={unitId ?? ""} onChange={(e) => update({ page: 1, filters: { unitId: e.target.value || undefined } })} aria-label="Unit">
+            <option value="">All units</option>
+            {(units.data?.items ?? []).map((u) => (
+              <option key={u.id} value={u.id}>{u.unitNumber}{u.tenantName ? ` · ${u.tenantName}` : ""}</option>
+            ))}
+          </select>
+        )}
+        <select className={`${selectClass} w-auto`} value={period} onChange={(e) => update({ page: 1, filters: { period: e.target.value === "12m" ? undefined : e.target.value, from: undefined, to: undefined } })} aria-label="Period">
           <option value="12m">Last 12 months</option>
           <option value="ytd">This year</option>
           <option value="3m">Last 3 months</option>
           <option value="all">All time</option>
+          <option value="custom">Custom dates…</option>
         </select>
+        {period === "custom" && <DateRange from={state.filters.from} to={state.filters.to} onChange={(from, to) => update({ page: 1, filters: { from, to } })} />}
       </div>
 
       {summary.isError && (
@@ -133,7 +151,7 @@ export function ExpensesPage() {
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label={period === "12m" ? "Last 12 months" : period === "ytd" ? "This year" : period === "3m" ? "Last 3 months" : "All time"} value={formatMoney(s?.total)} hint={s ? `${s.expenseCount} expenses` : undefined} />
+        <Stat label={period === "12m" ? "Last 12 months" : period === "ytd" ? "This year" : period === "3m" ? "Last 3 months" : period === "custom" ? "Selected dates" : "All time"} value={formatMoney(s?.total)} hint={s ? `${s.expenseCount} expenses` : undefined} />
         <Stat label="This month" value={formatMoney(s?.thisMonth)} hint={delta === null ? undefined : `${delta >= 0 ? "+" : ""}${delta.toFixed(0)}% vs last month`} />
         <Stat label="Last month" value={formatMoney(s?.lastMonth)} />
         <Stat label="Outstanding from occupants" value={formatMoney(s?.outstanding)} hint={s ? `${s.outstandingShares} unpaid shares` : undefined} />
@@ -143,7 +161,7 @@ export function ExpensesPage() {
         <Card>
           <CardHeader>
             <CardTitle>By month</CardTitle>
-            <CardDescription>Total expenses per month{buildingId ? " for this property" : ""}.</CardDescription>
+            <CardDescription>Total expenses per month{unitId ? " for this unit" : buildingId ? " for this property" : ""}.</CardDescription>
           </CardHeader>
           <CardContent><MonthlyTrend data={monthly} /></CardContent>
         </Card>

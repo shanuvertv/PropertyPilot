@@ -247,7 +247,7 @@ export class ApiClient {
   }
 
   // ---- tenants
-  listTenants(p: ListParams) {
+  listTenants(p: ListParams & { buildingId?: string; active?: boolean }) {
     return this.request<Page<Tenant>>("GET", `/api/tenants${qs(p)}`);
   }
   tenantOptions() {
@@ -362,7 +362,7 @@ export class ApiClient {
   }
 
   // ---- follow-ups
-  listFollowUps(p: ListParams & { scope?: "today" | "overdue" | "upcoming" | "open" | "all"; mine?: boolean }) {
+  listFollowUps(p: ListParams & { scope?: "today" | "overdue" | "upcoming" | "open" | "all"; mine?: boolean; followUpType?: string; assignedEmployeeId?: string; buildingId?: string; from?: string; to?: string }) {
     return this.request<Page<FollowUp>>("GET", `/api/follow-ups${qs(p)}`);
   }
   followUpCounts(mine = false) {
@@ -489,6 +489,9 @@ export class ApiClient {
   }
 
   // ---- occupants & expenses
+  searchOccupants(p: ListParams & { buildingId?: string; unitId?: string; tenantId?: string; current?: boolean }) {
+    return this.request<Page<Occupant>>("GET", `/api/occupants${qs(p)}`);
+  }
   occupants(unitId: string, includePast = false) {
     return this.request<Occupant[]>("GET", `/api/units/${unitId}/occupants${qs({ includePast })}`);
   }

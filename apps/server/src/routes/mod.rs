@@ -204,6 +204,7 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
             "/api/units/{id}/occupants",
             get(expenses::list_occupants).post(expenses::create_occupant),
         )
+        .route("/api/occupants", get(expenses::search_occupants))
         .route(
             "/api/occupants/{id}",
             put(expenses::update_occupant).delete(expenses::delete_occupant),

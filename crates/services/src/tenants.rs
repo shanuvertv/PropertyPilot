@@ -4,7 +4,7 @@ use renewal_core::Capability;
 use renewal_db::contracts::{self, ContractRow};
 use renewal_db::paging::{ListQuery, PageResult};
 use renewal_db::renewals::{self, CaseRow};
-use renewal_db::tenants::{self, TenantInput, TenantRow};
+use renewal_db::tenants::{self, TenantFilter, TenantInput, TenantRow};
 use renewal_db::PgPool;
 use uuid::Uuid;
 
@@ -16,10 +16,11 @@ use crate::session::Session;
 pub async fn list(
     pool: &PgPool,
     caller: &Session,
+    f: &TenantFilter,
     q: &ListQuery,
 ) -> ServiceResult<PageResult<TenantRow>> {
     caller.require(Capability::ViewTenants)?;
-    Ok(tenants::list(pool, q).await?)
+    Ok(tenants::list(pool, f, q).await?)
 }
 
 pub async fn options(pool: &PgPool, caller: &Session) -> ServiceResult<Vec<TenantRow>> {

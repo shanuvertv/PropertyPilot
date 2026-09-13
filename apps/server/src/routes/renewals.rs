@@ -210,8 +210,12 @@ pub async fn list_follow_ups(
         assigned_employee_id: if p.mine.unwrap_or(false) {
             Some(caller.user_id)
         } else {
-            None
+            dto::uuid_opt(&p.assigned_employee_id, "assigned employee")?
         },
+        follow_up_type: p.follow_up_type.map(|t| t.to_string()),
+        building_id: dto::uuid_opt(&p.building_id, "building")?,
+        due_from: dto::date_opt(&p.from, "from")?,
+        due_to: dto::date_opt(&p.to, "to")?,
     };
     let res = follow_ups::list(&state.pool, &caller, &f, &q).await?;
     Ok(Json(dto::page(res, q.page, q.page_size, dto::follow_up)))

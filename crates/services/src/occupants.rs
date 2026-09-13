@@ -2,7 +2,8 @@
 
 use chrono::NaiveDate;
 use renewal_core::Capability;
-use renewal_db::occupants::{self, OccupantInput, OccupantRow};
+use renewal_db::occupants::{self, OccupantFilter, OccupantInput, OccupantRow};
+use renewal_db::paging::{ListQuery, PageResult};
 use renewal_db::{units, PgPool};
 use uuid::Uuid;
 
@@ -19,6 +20,16 @@ pub async fn for_unit(
 ) -> ServiceResult<Vec<OccupantRow>> {
     caller.require(Capability::ViewOccupants)?;
     Ok(occupants::for_unit(pool, unit_id, include_past).await?)
+}
+
+pub async fn search(
+    pool: &PgPool,
+    caller: &Session,
+    f: &OccupantFilter,
+    q: &ListQuery,
+) -> ServiceResult<PageResult<OccupantRow>> {
+    caller.require(Capability::ViewOccupants)?;
+    Ok(occupants::search(pool, f, q).await?)
 }
 
 pub async fn get(pool: &PgPool, caller: &Session, id: Uuid) -> ServiceResult<OccupantRow> {

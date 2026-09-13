@@ -14,6 +14,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
+import { useLocalFilter } from "@/lib/local-filter";
+import { SearchBox } from "@/components/SearchBox";
 import { TENANT_RESPONSE_LABEL, formatDate, formatDateTime } from "@/lib/format";
 import { TenantDialog } from "./TenantDialog";
 import { TenantEmails } from "./TenantEmails";
@@ -27,6 +29,7 @@ export function TenantDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const detail = useQuery({ queryKey: ["tenants", id], queryFn: () => api.getTenant(id) });
+  const contractFilter = useLocalFilter(detail.data?.contracts, (c) => [c.contractNumber, c.buildingName, c.unitNumbers, c.status, c.startDate, c.endDate]);
   const t = detail.data?.tenant;
 
   async function archive() {
@@ -69,8 +72,9 @@ export function TenantDetailPage() {
   }
   if (!t || !detail.data) return <p className="text-muted-foreground">Loading…</p>;
 
-  const current = detail.data.contracts.filter((c) => c.status === "ACTIVE" || c.status === "DRAFT");
-  const history = detail.data.contracts.filter((c) => c.status !== "ACTIVE" && c.status !== "DRAFT");
+  const contracts = contractFilter.filtered ?? [];
+  const current = contracts.filter((c) => c.status === "ACTIVE" || c.status === "DRAFT");
+  const history = contracts.filter((c) => c.status !== "ACTIVE" && c.status !== "DRAFT");
 
   return (
     <>
@@ -101,16 +105,18 @@ export function TenantDetailPage() {
       <Tabs defaultValue="current">
         <TabsList>
           <TabsTrigger value="current">Current ({current.length})</TabsTrigger>
-          <TabsTrigger value="history">History ({history.length + detail.data.cases.length})</TabsTrigger>
+          <TabsTrigger value="past">Past contracts ({history.length + detail.data.cases.length})</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
           <TabsTrigger value="documents">Documents ({detail.data.documents.length})</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
         <TabsContent value="current" className="pt-4">
+          <div className="mb-3"><SearchBox value={contractFilter.q} onChange={contractFilter.setQ} placeholder="Search contract, building, unit or status" /></div>
           <DataTable columns={contractCols} rows={current} rowKey={(c) => c.id} empty="No active contracts. Create one from Contracts." />
         </TabsContent>
-        <TabsContent value="history" className="flex flex-col gap-6 pt-4">
+        <TabsContent value="past" className="flex flex-col gap-6 pt-4">
+          <SearchBox value={contractFilter.q} onChange={contractFilter.setQ} placeholder="Search contract, building, unit or status" />
           <section>
             <h3 className="mb-2 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">Previous contracts</h3>
             <DataTable columns={contractCols} rows={history} rowKey={(c) => c.id} empty="No previous contracts." />

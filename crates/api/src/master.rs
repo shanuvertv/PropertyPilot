@@ -189,6 +189,30 @@ pub struct Tenant {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenantListParams {
+    pub q: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+    pub sort: Option<String>,
+    pub dir: Option<String>,
+    pub building_id: Option<String>,
+    pub active: Option<bool>,
+}
+
+impl TenantListParams {
+    pub fn list(&self) -> ListParams {
+        ListParams {
+            q: self.q.clone(),
+            page: self.page,
+            page_size: self.page_size,
+            sort: self.sort.clone(),
+            dir: self.dir.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
