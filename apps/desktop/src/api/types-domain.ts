@@ -95,6 +95,9 @@ export interface BuildingDetail {
 
 // ---------------------------------------------------------------- units
 
+/** What a unit is let as; how many people live there is the occupant count. */
+export type UnitType = "RESIDENTIAL" | "COMMERCIAL";
+
 export interface UnitSummary {
   id: string;
   buildingId: string;
@@ -109,6 +112,8 @@ export interface UnitSummary {
   notes: string | null;
   contractId: string | null;
   contractNumber: string | null;
+  /** ACTIVE, or EXPIRED while the tenant has not handed the unit back. */
+  contractStatus: ContractStatus | null;
   /** This unit's rent under its active contract. */
   rentAmount: number | null;
   tenantId: string | null;
@@ -136,6 +141,20 @@ export interface UnitInput {
   notes: string | null;
 }
 
+export interface BulkUnitsRequest {
+  numbers: string[];
+  /** One floor for all of them, or one per unit number. */
+  floors?: string[];
+  unitType: string | null;
+  notes: string | null;
+}
+
+export interface BulkUnitsResult {
+  created: number;
+  /** Numbers that already existed in the building. */
+  skipped: string[];
+}
+
 export interface UnitListParams extends ListParams {
   buildingId?: string;
   status?: UnitStatus;
@@ -143,6 +162,7 @@ export interface UnitListParams extends ListParams {
   renewalStatus?: RenewalStatus;
   tenantId?: string;
   expiringSoon?: boolean;
+  unitType?: string;
 }
 
 // ---------------------------------------------------------------- tenants
@@ -260,6 +280,8 @@ export interface ContractInput {
   assignedEmployeeId: string | null;
   notes: string | null;
   activate?: boolean;
+  /** Re-letting after a contract ended: its units may go onto this one. */
+  replacesContractId?: string | null;
 }
 
 export interface ContractDetail {

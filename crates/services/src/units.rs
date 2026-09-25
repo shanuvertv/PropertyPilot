@@ -1,6 +1,6 @@
 //! Unit management and the Unit-Wise Summary (spec §3, §16).
 
-use renewal_core::{Capability, UnitStatus};
+use renewal_core::{Capability, UnitStatus, UnitType};
 use renewal_db::paging::{ListQuery, PageResult};
 use renewal_db::units::{self, UnitFilter, UnitInput, UnitSummaryRow};
 use renewal_db::{buildings, PgPool};
@@ -49,6 +49,151 @@ fn validate(input: &mut UnitInput) -> ServiceResult<()> {
         .status
         .parse::<UnitStatus>()
         .map_err(|_| ServiceError::validation("invalid unit status"))?;
+    if let Some(t) = &input.unit_type {
+        input.unit_type = Some(
+            t.parse::<UnitType>()
+                .map_err(|_| {
+                    ServiceError::validation("the unit type must be Residential or Commercial")
+                })?
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// How many units one bulk add may create at a time.
+pub const MAX_BULK_UNITS: usize = 500;
+
+pub struct BulkUnits {
+    pub building_id: Uuid,
+    /// Unit numbers to create, e.g. `101 … 110`; duplicates and existing numbers are skipped.
+    pub numbers: Vec<String>,
+    /// Floor for every unit, or per unit when the lengths match.
+    pub floors: Vec<Option<String>>,
+    pub unit_type: Option<String>,
+    pub notes: Option<String>,
+}
+
+pub struct BulkResult {
+    pub created: usize,
+    pub skipped: Vec<String>,
+}
+
+/// Adds a whole floor or building of units in one go (see `BulkUnits`); numbers that
+/// already exist in the building are skipped, never duplicated.
+pub async fn create_bulk(
+    pool: &PgPool,
+    caller: &Session,
+    mut input: BulkUnits,
+) -> ServiceResult<BulkResult> {
+    caller.require(Capability::ManageUnits)?;
+    if let Some(t) = &input.unit_type {
+        input.unit_type = Some(
+            t.parse::<UnitType>()
+                .map_err(|_| {
+                    ServiceError::validation("the unit type must be Residential or Commercial")
+                })?
+                .to_string(),
+        );
+    }
+    let mut tx = pool.begin().await?;
+    buildings::find(&mut *tx, input.building_id)
+        .await?
+        .filter(|b| b.archived_at.is_none())
+        .ok_or(ServiceError::NotFound("building"))?;
+    let existing: Vec<String> = units::existing_numbers(&mut *tx, input.building_id)
+        .await?
+        .into_iter()
+        .map(|n| n.trim().to_ascii_uppercase())
+        .collect();
+
+    let mut numbers: Vec<String> = Vec::new();
+    let mut floors: Vec<Option<String>> = Vec::new();
+    let mut skipped: Vec<String> = Vec::new();
+    let mut seen: Vec<String> = Vec::new();
+    for (i, raw) in input.numbers.iter().enumerate() {
+        let number = raw.trim().to_owned();
+        if number.is_empty() {
+            continue;
+        }
+        let key = number.to_ascii_uppercase();
+        if existing.contains(&key) || seen.contains(&key) {
+            skipped.push(number);
+            continue;
+        }
+        seen.push(key);
+        let floor = input
+            .floors
+            .get(i)
+            .cloned()
+            .flatten()
+            .or_else(|| input.floors.first().cloned().flatten())
+            .map(|f| f.trim().to_owned())
+            .filter(|f| !f.is_empty());
+        numbers.push(number);
+        floors.push(floor);
+    }
+    if numbers.is_empty() {
+        return Err(ServiceError::validation(if skipped.is_empty() {
+            "no unit numbers were given"
+        } else {
+            "every one of those unit numbers already exists in this building"
+        }));
+    }
+    if numbers.len() > MAX_BULK_UNITS {
+        return Err(ServiceError::validation(format!(
+            "at most {MAX_BULK_UNITS} units can be added at once"
+        )));
+    }
+    let notes = input
+        .notes
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty());
+    let ids = units::insert_many(
+        &mut *tx,
+        input.building_id,
+        &numbers,
+        &floors,
+        input.unit_type.as_deref(),
+        &UnitStatus::Vacant.to_string(),
+        notes,
+        caller.user_id,
+    )
+    .await?;
+    audit_log::log(
+        &mut *tx,
+        caller,
+        "building",
+        input.building_id,
+        "UNITS_ADDED",
+        NONE,
+        Some(&serde_json::json!({ "created": ids.len(), "numbers": numbers, "skipped": skipped })),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(BulkResult {
+        created: ids.len(),
+        skipped,
+    })
+}
+
+/// Removes a unit created by mistake. Only possible while nothing references it —
+/// anything with contracts or expenses behind it is archived instead.
+pub async fn delete(pool: &PgPool, caller: &Session, id: Uuid) -> ServiceResult<()> {
+    caller.require(Capability::ManageUnits)?;
+    let mut tx = pool.begin().await?;
+    let before = units::find(&mut *tx, id)
+        .await?
+        .ok_or(ServiceError::NotFound("unit"))?;
+    if units::has_history(&mut *tx, id).await? {
+        return Err(ServiceError::Conflict(
+            "this unit has contracts or expenses on it — archive it instead of deleting".into(),
+        ));
+    }
+    units::delete(&mut *tx, id).await?;
+    audit_log::log(&mut *tx, caller, "unit", id, "DELETED", Some(&before), NONE).await?;
+    tx.commit().await?;
     Ok(())
 }
 

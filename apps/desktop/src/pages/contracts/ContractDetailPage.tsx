@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Pencil, Play, XCircle } from "lucide-react";
+import { CalendarClock, KeyRound, Pencil, Play, XCircle } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { ContractStatusBadge, ExpiryChip, NoticeStatusBadge, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
-import { FormDialog, SelectField, TextAreaField, errorMessage } from "@/components/forms";
+import { FormDialog, SelectField, TextAreaField, TextField, errorMessage } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from "@/lib/app-state";
-import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, todayIso } from "@/lib/format";
 import { useEmployees } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { ContractCheques } from "@/pages/cheques/ContractCheques";
@@ -30,6 +30,8 @@ export function ContractDetailPage() {
   const [edit, setEdit] = useState(false);
   const [terminate, setTerminate] = useState(false);
   const [reason, setReason] = useState("");
+  const [endedOn, setEndedOn] = useState(todayIso());
+  const [relet, setRelet] = useState(false);
   const [startRenewal, setStartRenewal] = useState(false);
   const [assignee, setAssignee] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +55,15 @@ export function ContractDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     ]);
   };
+
+  // After a contract expires the units stay Occupied until somebody records the handover,
+  // so they cannot be let to another tenant by mistake.
+  const unitsHeld = (detail.data?.units ?? []).some((u) => u.status === "OCCUPIED") && c?.status !== "ACTIVE" && c?.status !== "DRAFT";
+  const release = useMutation({
+    mutationFn: () => api.releaseContractUnits(id),
+    onSuccess: () => void invalidate(),
+    onError: (e) => setError(errorMessage(e, "Could not release the units.")),
+  });
 
   const activate = useMutation({
     mutationFn: () => api.activateContract(id),
@@ -84,7 +95,7 @@ export function ContractDetailPage() {
                 Activate
               </Button>
             )}
-            {c.status === "ACTIVE" && !c.caseId && can("MANAGE_RENEWALS") && (
+            {(c.status === "ACTIVE" || (c.status === "EXPIRED" && unitsHeld)) && !c.caseId && can("MANAGE_RENEWALS") && (
               <Button onClick={() => setStartRenewal(true)}>
                 <CalendarClock data-icon="inline-start" />
                 Start renewal
@@ -95,6 +106,20 @@ export function ContractDetailPage() {
                 Open renewal case
               </Button>
             )}
+            {c.status !== "ACTIVE" && c.status !== "DRAFT" && can("MANAGE_CONTRACTS") && (
+              <>
+                {unitsHeld && !c.caseId && (
+                  <Button variant="outline" onClick={() => release.mutate()} disabled={release.isPending}>
+                    <KeyRound data-icon="inline-start" />
+                    Release units
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setRelet(true)}>
+                  <Play data-icon="inline-start" />
+                  Re-let these units
+                </Button>
+              </>
+            )}
             {(c.status === "DRAFT" || c.status === "ACTIVE") && can("MANAGE_CONTRACTS") && (
               <>
                 <Button variant="outline" onClick={() => setEdit(true)}>
@@ -102,9 +127,9 @@ export function ContractDetailPage() {
                   Edit
                 </Button>
                 {c.status === "ACTIVE" && (
-                  <Button variant="ghost" onClick={() => setTerminate(true)}>
+                  <Button variant="outline" className="text-destructive" onClick={() => setTerminate(true)}>
                     <XCircle data-icon="inline-start" />
-                    Terminate
+                    Cancel contract
                   </Button>
                 )}
               </>
@@ -268,20 +293,39 @@ export function ContractDetailPage() {
       </Tabs>
 
       <ContractDialog open={edit} onOpenChange={setEdit} contract={c} onSaved={() => void invalidate()} />
+      <ContractDialog
+        open={relet}
+        onOpenChange={setRelet}
+        defaults={{
+          tenantId: c.tenantId,
+          buildingId: c.buildingId,
+          unitIds: c.unitIds,
+          unitTerms: c.unitTerms,
+          rentTerms: c.rentTerms,
+          replacesContractId: c.id,
+        }}
+        onSaved={(saved) => {
+          void invalidate();
+          navigate(`/contracts/${saved.id}`);
+        }}
+      />
 
       <FormDialog
         open={terminate}
         onOpenChange={setTerminate}
-        title={`Terminate ${c.contractNumber}?`}
+        title={`Cancel contract ${c.contractNumber}?`}
         description="The units become vacant and any open renewal case is closed. This cannot be undone."
-        submitLabel="Terminate contract"
+        submitLabel="Cancel the contract"
         destructive
         onSubmit={async () => {
-          await api.terminateContract(c.id, reason.trim() || null);
+          await api.terminateContract(c.id, reason.trim() || null, endedOn || null);
           await invalidate();
         }}
       >
-        <TextAreaField id="term-reason" label="Reason (optional)" value={reason} onChange={setReason} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField id="term-ended" label="Ended on" type="date" value={endedOn} onChange={setEndedOn} required hint="The day the tenancy actually ends." />
+          <TextAreaField id="term-reason" label="Reason (optional)" value={reason} onChange={setReason} className="sm:col-span-2" />
+        </div>
       </FormDialog>
 
       <FormDialog

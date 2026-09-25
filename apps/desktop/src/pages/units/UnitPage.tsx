@@ -13,6 +13,7 @@ import { useLocalFilter } from "@/lib/local-filter";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -73,7 +74,10 @@ export function UnitPage() {
           </div>
           <div>
             <div className="text-[12px] text-muted-foreground">Contract ends</div>
-            <div className="flex items-center gap-2">{formatDate(u.endDate)} {u.band && <ExpiryChip band={u.band} days={u.remainingDays} />}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              {formatDate(u.endDate)}
+              {u.contractStatus === "EXPIRED" ? <Badge variant="destructive">Expired — still occupied</Badge> : u.band && <ExpiryChip band={u.band} days={u.remainingDays} />}
+            </div>
           </div>
           <div>
             <div className="text-[12px] text-muted-foreground">Renewal</div>

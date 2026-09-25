@@ -79,6 +79,10 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
                 .put(master::update_unit)
                 .delete(master::archive_unit),
         )
+        .route(
+            "/api/buildings/{id}/units/bulk",
+            post(master::create_units_bulk),
+        )
         .route("/api/units/{id}/status", put(master::set_unit_status))
         .route(
             "/api/tenants",
@@ -113,6 +117,7 @@ pub fn router(state: AppState, web_dir: Option<std::path::PathBuf>) -> Router {
         )
         .route("/api/contracts/{id}/activate", post(contracts::activate))
         .route("/api/contracts/{id}/terminate", post(contracts::terminate))
+        .route("/api/contracts/{id}/release", post(contracts::release))
         .route("/api/contracts/{id}/assign", put(contracts::assign))
         .route(
             "/api/contracts/{id}/renewal",

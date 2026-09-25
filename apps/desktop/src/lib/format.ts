@@ -10,6 +10,7 @@ import type {
   SplitMethod,
   TenantResponse,
   UnitStatus,
+  UnitType,
 } from "@/api/types-domain";
 
 export const APP_NAME = "PropertyPilot";
@@ -163,4 +164,9 @@ export const CHEQUE_STATUS_LABEL: Record<ChequeStatus, string> = {
   CLEARED: "Cleared",
   BOUNCED: "Bounced",
   CANCELLED: "Cancelled",
+};
+
+export const UNIT_TYPE_LABEL: Record<UnitType, string> = {
+  RESIDENTIAL: "Residential",
+  COMMERCIAL: "Commercial",
 };

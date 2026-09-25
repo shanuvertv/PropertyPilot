@@ -90,6 +90,9 @@ pub struct ContractInput {
     pub notes: Option<String>,
     /// Create straight into Active (default) or leave as Draft.
     pub activate: Option<bool>,
+    /// Re-letting after a contract ended: its units may go onto this one.
+    #[serde(default)]
+    pub replaces_contract_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +131,9 @@ pub struct ContractListParams {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct TerminateContractRequest {
     pub reason: Option<String>,
+    /// The day the tenancy actually ended (an early termination); omitted = today.
+    #[serde(default)]
+    pub ended_on: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

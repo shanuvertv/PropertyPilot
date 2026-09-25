@@ -30,6 +30,11 @@ status_enum! {
 }
 
 status_enum! {
+    /// What a unit is let as. How many people live there is the occupant count, not the type.
+    UnitType { Residential, Commercial }
+}
+
+status_enum! {
     /// Renewal case status (spec §7 step 2) — the eleven workflow states.
     RenewalStatus {
         NotStarted,
@@ -85,6 +90,9 @@ impl ContractStatus {
                 | (Active, Renewed)
                 | (Active, Expired)
                 | (Active, Terminated)
+                // A renewal signed after the end date: the tenant is still in the unit.
+                | (Expired, Renewed)
+                | (Expired, Terminated)
         )
     }
 
@@ -215,7 +223,9 @@ mod tests {
         assert!(Active.can_transition_to(Renewed));
         assert!(Active.can_transition_to(Expired));
         assert!(Active.can_transition_to(Terminated));
-        for terminal in [Renewed, Expired, Terminated] {
+        // Renewed and Terminated are final; an Expired contract can still be renewed or
+        // cancelled, because leases are often signed (or ended) after the end date.
+        for terminal in [Renewed, Terminated] {
             for to in ContractStatus::iter() {
                 assert!(
                     !terminal.can_transition_to(to),
@@ -223,6 +233,9 @@ mod tests {
                 );
             }
         }
+        assert!(Expired.can_transition_to(Renewed));
+        assert!(Expired.can_transition_to(Terminated));
+        assert!(!Expired.can_transition_to(Active));
         assert!(!Draft.can_transition_to(Renewed));
         assert!(!Draft.can_transition_to(Expired));
         let err = Expired.transition(Active).unwrap_err();

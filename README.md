@@ -9,7 +9,9 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
 
 ## What it does
 
-- Buildings, units and tenants with documents; unit-wise summary with expiry colours
+- Buildings, units and tenants with documents; unit-wise summary with expiry colours; units
+  are Residential or Commercial, added one by one or a whole range at once (101-120), and a
+  unit added by mistake can be deleted (one with history is archived)
 - Contracts (multi-unit) with rent and number of occupants **per unit** (the contract total is
   the sum), payment terms, and automatic expiry bands (0–30 / 31–60 / 61–90 / 91–120 / beyond)
 - Post-dated rent cheques per contract: split the rent into N cheques over the period (or add
@@ -17,7 +19,12 @@ See [PLAN.md](PLAN.md) for the full implementation plan and phase status.
   a Cheques page (overdue, due in 7 / 30 days) and a dashboard block; the daily sweep reminds
   the assigned employee N days before each cheque date, on the day, and once when overdue
 - Renewal cases: 11-status workflow, tenant responses, follow-ups, checklist, completion that
-  creates the linked renewal contract and keeps the timeline
+  creates the linked renewal contract (same units, occupants and rent) and keeps the timeline —
+  a contract that has just expired can still be renewed
+- An expired contract keeps its units Occupied until the handover is recorded ("Release units"),
+  so they never look available to another tenant by mistake; "Re-let these units" starts a new
+  contract from a finished one, and an active contract can be cancelled mid-term with its real
+  end date
 - Renewal notices: auto-drafted letter → PDF (letterhead) → email with attachment, tracked
 - Email templates with placeholders, queue with retries, SMTP or Microsoft Graph
 - Automation: daily sweep marks expired contracts, opens cases, fires reminder rules once

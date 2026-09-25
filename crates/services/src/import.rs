@@ -666,7 +666,8 @@ pub async fn commit(pool: &PgPool, caller: &Session, bytes: &[u8]) -> ServiceRes
                         building_id,
                         unit_number: number.clone(),
                         floor: None,
-                        unit_type: r.capacity.map(|c| format!("{c} beds")),
+                        // Beds are the occupant count on the contract; the type is the category.
+                        unit_type: Some("RESIDENTIAL".to_owned()),
                         status: UnitStatus::Vacant.to_string(),
                         notes: None,
                     },

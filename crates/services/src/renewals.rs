@@ -74,9 +74,9 @@ pub async fn start(
     let contract = contracts::find(&mut *tx, contract_id)
         .await?
         .ok_or(ServiceError::NotFound("contract"))?;
-    if contract.status != ContractStatus::Active.to_string() {
+    if !matches!(contract.status.as_str(), "ACTIVE" | "EXPIRED") {
         return Err(ServiceError::Conflict(format!(
-            "only active contracts can be renewed (this one is {})",
+            "only active or just-expired contracts can be renewed (this one is {})",
             contract.status
         )));
     }
@@ -387,9 +387,11 @@ pub async fn complete(
     let old = contracts::find(&mut *tx, case.contract_id)
         .await?
         .ok_or(ServiceError::NotFound("contract"))?;
-    if old.status != ContractStatus::Active.to_string() {
+    // An expired contract can still be renewed — leases are often signed after the end
+    // date, and the tenant is still in the unit until the handover is recorded.
+    if !matches!(old.status.as_str(), "ACTIVE" | "EXPIRED") {
         return Err(ServiceError::Conflict(format!(
-            "the current contract is {}, not Active",
+            "the current contract is {}, so it cannot be renewed",
             old.status
         )));
     }

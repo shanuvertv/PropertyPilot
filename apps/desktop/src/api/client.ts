@@ -84,6 +84,8 @@ import type {
   ChequeStatus,
   ChequeSummary,
   GenerateChequesRequest,
+  BulkUnitsRequest,
+  BulkUnitsResult,
 } from "./types-domain";
 
 /** Thrown for any non-2xx response, or when the server cannot be reached at all. */
@@ -253,6 +255,14 @@ export class ApiClient {
   archiveUnit(id: string) {
     return this.request<void>("DELETE", `/api/units/${id}`);
   }
+  /** Removes a unit created by mistake; anything with history has to be archived. */
+  deleteUnit(id: string) {
+    return this.request<void>("DELETE", `/api/units/${id}?permanent=true`);
+  }
+  /** Adds a whole floor or building of units at once. */
+  createUnitsBulk(buildingId: string, req: BulkUnitsRequest) {
+    return this.request<BulkUnitsResult>("POST", `/api/buildings/${buildingId}/units/bulk`, req);
+  }
 
   // ---- tenants
   listTenants(p: ListParams & { buildingId?: string; active?: boolean }) {
@@ -316,8 +326,12 @@ export class ApiClient {
   activateContract(id: string) {
     return this.request<Contract>("POST", `/api/contracts/${id}/activate`);
   }
-  terminateContract(id: string, reason: string | null) {
-    return this.request<Contract>("POST", `/api/contracts/${id}/terminate`, { reason });
+  terminateContract(id: string, reason: string | null, endedOn?: string | null) {
+    return this.request<Contract>("POST", `/api/contracts/${id}/terminate`, { reason, endedOn: endedOn ?? null });
+  }
+  /** Hands the units of a finished contract back so they can be let again. */
+  releaseContractUnits(id: string) {
+    return this.request<Contract>("POST", `/api/contracts/${id}/release`);
   }
   assignContract(id: string, assignedEmployeeId: string | null) {
     return this.request<Contract>("PUT", `/api/contracts/${id}/assign`, { assignedEmployeeId });

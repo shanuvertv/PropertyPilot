@@ -1,21 +1,23 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Layers, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
-import type { Band, RenewalStatus, UnitStatus, UnitSummary } from "@/api/types-domain";
+import type { Band, RenewalStatus, UnitStatus, UnitSummary, UnitType } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
 import { DataTable, Paginator, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { errorMessage, selectClass } from "@/components/forms";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBox } from "@/components/SearchBox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-state";
 import { BAND_LABEL } from "@/lib/bands";
-import { BAND_ORDER, RENEWAL_STATUS_LABEL, UNIT_STATUS_LABEL, formatDate, keys, formatMoney } from "@/lib/format";
+import { BAND_ORDER, RENEWAL_STATUS_LABEL, UNIT_STATUS_LABEL, formatDate, keys, formatMoney, UNIT_TYPE_LABEL } from "@/lib/format";
 import { useListParams } from "@/lib/list-params";
 import { useBuildingOptions } from "@/lib/queries";
+import { BulkUnitsDialog } from "./BulkUnitsDialog";
 import { UnitDialog } from "./UnitDialog";
 
 /** Spec §3 + §16: the Unit-Wise Summary — one row per unit with its live contract and renewal state. */
@@ -38,6 +40,7 @@ export function UnitsPage() {
         sort: state.sort,
         dir: state.dir,
         buildingId: state.filters.buildingId,
+        unitType: state.filters.unitType,
         status: state.filters.status as UnitStatus | undefined,
         band: state.filters.band as Band | undefined,
         renewalStatus: state.filters.renewalStatus as RenewalStatus | undefined,
@@ -47,6 +50,7 @@ export function UnitsPage() {
   });
 
   const [view, setView] = useViewMode("units");
+  const [bulk, setBulk] = useState(false);
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: UnitStatus }) => api.setUnitStatus(id, status),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["units"] }),
@@ -56,14 +60,19 @@ export function UnitsPage() {
   const columns: Column<UnitSummary>[] = [
     { key: "building", header: "Building", sort: "building_name", card: "subtitle", render: (u) => <Link to={`/buildings/${u.buildingId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.buildingName}</Link> },
     { key: "unit", header: "Unit", sort: "unit_number", card: "title", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
-    { key: "type", header: "Type", sort: "unit_type", render: (u) => u.unitType ?? "—" },
+    { key: "type", header: "Type", sort: "unit_type", render: (u) => (u.unitType ? UNIT_TYPE_LABEL[u.unitType as UnitType] ?? u.unitType : "—") },
     { key: "people", header: "No. of occupants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
     { key: "rent", header: "Rent", className: "text-right tabular-nums", card: "metric", render: (u) => (u.rentAmount === null ? "—" : formatMoney(u.rentAmount)) },
     { key: "tenant", header: "Tenant", sort: "tenant_name", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : <span className="text-muted-foreground">—</span>) },
     { key: "start", header: "Start", sort: "start_date", render: (u) => formatDate(u.startDate) },
     { key: "end", header: "End", sort: "end_date", card: "metric", render: (u) => formatDate(u.endDate) },
     { key: "remaining", header: "Remaining", sort: "remaining_days", card: "metric", render: (u) => <ExpiryChip band={u.band} days={u.remainingDays} /> },
-    { key: "status", header: "Status", sort: "status", card: "badge", render: (u) => <UnitStatusBadge status={u.status} /> },
+    { key: "status", header: "Status", sort: "status", card: "badge", render: (u) => (
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <UnitStatusBadge status={u.status} />
+        {u.contractStatus === "EXPIRED" && <Badge variant="destructive">Contract expired</Badge>}
+      </span>
+    ) },
     { key: "renewal", header: "Renewal", sort: "renewal_status", card: "badge", render: (u) => <RenewalStatusBadge status={u.renewalStatus} /> },
     { key: "assigned", header: "Assigned to", render: (u) => u.assignedEmployeeName ?? "—" },
     {
@@ -118,10 +127,16 @@ export function UnitsPage() {
         description="Unit-wise summary: every unit with its current tenant, contract dates, remaining days and renewal status."
         actions={
           can("MANAGE_UNITS") && (
-            <Button onClick={() => setDialog({ open: true, unit: null })}>
-              <Plus data-icon="inline-start" />
-              Add unit
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setBulk(true)}>
+                <Layers data-icon="inline-start" />
+                Add many
+              </Button>
+              <Button onClick={() => setDialog({ open: true, unit: null })}>
+                <Plus data-icon="inline-start" />
+                Add unit
+              </Button>
+            </>
           )
         }
       />
@@ -137,6 +152,14 @@ export function UnitsPage() {
           {buildings.data?.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
+            </option>
+          ))}
+        </select>
+        <select className={`${selectClass} w-auto`} value={state.filters.unitType ?? ""} onChange={(e) => update({ filters: { unitType: e.target.value || undefined } })} aria-label="Unit type">
+          <option value="">Any type</option>
+          {keys(UNIT_TYPE_LABEL).map((t) => (
+            <option key={t} value={t}>
+              {UNIT_TYPE_LABEL[t]}
             </option>
           ))}
         </select>
@@ -185,6 +208,7 @@ export function UnitsPage() {
         onRowClick={(u) => navigate(`/units/${u.id}`)}
       />
       {query.data && <Paginator page={state.page} pageSize={state.pageSize} total={query.data.total} onPage={(p) => update({ page: p })} />}
+      <BulkUnitsDialog open={bulk} onOpenChange={setBulk} buildingId={state.filters.buildingId} />
       <UnitDialog open={dialog.open} onOpenChange={(o) => setDialog((d) => ({ ...d, open: o }))} unit={dialog.unit} />
     </>
   );

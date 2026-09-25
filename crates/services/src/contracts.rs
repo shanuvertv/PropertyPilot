@@ -114,25 +114,74 @@ async fn validate(
     Ok(())
 }
 
-/// Units must not be under another ACTIVE contract when this one goes live.
+/// Units must be free when a contract goes live: not under another ACTIVE contract, and
+/// not still held under an EXPIRED one (the tenant has not handed the unit back yet, so
+/// letting it to somebody else would be a mistake — release it first).
 async fn ensure_units_free(
     conn: &mut PgConnection,
     unit_ids: &[Uuid],
-    except: Option<Uuid>,
+    except: &[Uuid],
 ) -> ServiceResult<()> {
-    let busy = units::occupied_by_other_contract(&mut *conn, unit_ids, except).await?;
+    let busy = units::blockers(&mut *conn, unit_ids, except).await?;
     if !busy.is_empty() {
-        let rows = units::find_many(&mut *conn, &busy).await?;
-        let names: Vec<String> = rows
+        let names: Vec<String> = busy
             .iter()
-            .map(|u| format!("{} ({})", u.unit_number, u.building_name))
+            .map(|b| {
+                if b.contract_status == "EXPIRED" {
+                    format!(
+                        "{} — still held by {} under expired contract {} (release it there first)",
+                        b.unit_number, b.tenant_name, b.contract_number
+                    )
+                } else {
+                    format!(
+                        "{} — under active contract {} ({})",
+                        b.unit_number, b.contract_number, b.tenant_name
+                    )
+                }
+            })
             .collect();
         return Err(ServiceError::Conflict(format!(
-            "already under an active contract: {}",
-            names.join(", ")
+            "these units are not free: {}",
+            names.join("; ")
         )));
     }
     Ok(())
+}
+
+/// Hands the units of a finished contract back: they become Vacant and can be let again.
+/// Used when an expired tenancy ends for real (the keys came back).
+pub async fn release(pool: &PgPool, caller: &Session, id: Uuid) -> ServiceResult<ContractRow> {
+    caller.require(Capability::ManageContracts)?;
+    let mut tx = pool.begin().await?;
+    let row = contracts::find(&mut *tx, id)
+        .await?
+        .ok_or(ServiceError::NotFound("contract"))?;
+    if row.status == ContractStatus::Active.to_string() {
+        return Err(ServiceError::Conflict(
+            "this contract is still active — terminate or let it expire first".into(),
+        ));
+    }
+    let freed = units::set_status_many(
+        &mut *tx,
+        &row.unit_ids,
+        &UnitStatus::Vacant.to_string(),
+        Some(&["OCCUPIED"]),
+    )
+    .await?;
+    audit_log::log(
+        &mut *tx,
+        caller,
+        "contract",
+        id,
+        "UNITS_RELEASED",
+        NONE,
+        Some(&serde_json::json!({ "units": freed })),
+    )
+    .await?;
+    tx.commit().await?;
+    contracts::find(pool, id)
+        .await?
+        .ok_or(ServiceError::NotFound("contract"))
 }
 
 pub async fn create(
@@ -140,17 +189,31 @@ pub async fn create(
     caller: &Session,
     mut input: ContractInput,
     activate: bool,
+    replaces: Option<Uuid>,
 ) -> ServiceResult<ContractRow> {
     caller.require(Capability::ManageContracts)?;
     let mut tx = pool.begin().await?;
     validate(&mut tx, &mut input, None).await?;
+    if let Some(old) = replaces {
+        let old_row = contracts::find(&mut *tx, old)
+            .await?
+            .ok_or(ServiceError::NotFound("the contract being replaced"))?;
+        if old_row.status == ContractStatus::Active.to_string() {
+            return Err(ServiceError::Conflict(
+                "the contract being replaced is still active — renew or terminate it instead"
+                    .into(),
+            ));
+        }
+    }
     let status = if activate {
         ContractStatus::Active
     } else {
         ContractStatus::Draft
     };
     if activate {
-        ensure_units_free(&mut tx, &input.unit_ids, None).await?;
+        // A contract being replaced (re-letting after it expired) does not block its own units.
+        let except: Vec<Uuid> = replaces.into_iter().collect();
+        ensure_units_free(&mut tx, &input.unit_ids, &except).await?;
     }
     let id = contracts::insert(
         &mut tx,
@@ -219,7 +282,7 @@ pub async fn update(
                 "tenant and building cannot change on an active contract".into(),
             ));
         }
-        ensure_units_free(&mut tx, &input.unit_ids, Some(id)).await?;
+        ensure_units_free(&mut tx, &input.unit_ids, &[id]).await?;
         let removed: Vec<Uuid> = before
             .unit_ids
             .iter()
@@ -273,7 +336,7 @@ pub async fn activate(pool: &PgPool, caller: &Session, id: Uuid) -> ServiceResul
         .parse()
         .map_err(|_| ServiceError::Internal("bad status".into()))?;
     status.transition(ContractStatus::Active)?;
-    ensure_units_free(&mut tx, &before.unit_ids, Some(id)).await?;
+    ensure_units_free(&mut tx, &before.unit_ids, &[id]).await?;
     contracts::set_status(&mut *tx, id, &ContractStatus::Active.to_string()).await?;
     units::set_status_many(
         &mut *tx,
@@ -317,6 +380,7 @@ pub async fn terminate(
     caller: &Session,
     id: Uuid,
     reason: Option<&str>,
+    ended_on: Option<chrono::NaiveDate>,
 ) -> ServiceResult<ContractRow> {
     caller.require(Capability::ManageContracts)?;
     let mut tx = pool.begin().await?;
@@ -329,6 +393,9 @@ pub async fn terminate(
         .map_err(|_| ServiceError::Internal("bad status".into()))?;
     status.transition(ContractStatus::Terminated)?;
     contracts::set_status(&mut *tx, id, &ContractStatus::Terminated.to_string()).await?;
+    if let Some(on) = ended_on {
+        contracts::set_ended_on(&mut *tx, id, on).await?;
+    }
     release_units(&mut tx, &before.unit_ids).await?;
     if let Some(case) = renewals::open_for_contract(&mut *tx, id).await? {
         renewals::set_status(&mut *tx, case.id, &RenewalStatus::Closed.to_string()).await?;
@@ -397,7 +464,9 @@ pub async fn expire_overdue(pool: &PgPool, actor: Option<&Session>) -> ServiceRe
         let mut tx = pool.begin().await?;
         let unit_ids = contracts::unit_ids(&mut *tx, *id).await?;
         contracts::set_status(&mut *tx, *id, &ContractStatus::Expired.to_string()).await?;
-        release_units(&mut tx, &unit_ids).await?;
+        // The units stay Occupied: the tenant is still in them until somebody records the
+        // handover ("Release units"), so they cannot be let to anyone else by accident.
+        let _ = &unit_ids;
         if let Some(a) = actor {
             audit_log::log(
                 &mut *tx,

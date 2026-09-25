@@ -407,6 +407,16 @@ pub async fn set_status<'e>(ex: impl PgExecutor<'e>, id: Uuid, status: &str) -> 
     .map(|_| ())
 }
 
+/// Overrides when the contract actually ended (an early termination).
+pub async fn set_ended_on<'e>(ex: impl PgExecutor<'e>, id: Uuid, on: NaiveDate) -> DbResult<()> {
+    sqlx::query("UPDATE contracts SET ended_at = $2::timestamptz, updated_at = now() WHERE id = $1")
+        .bind(id)
+        .bind(on)
+        .execute(ex)
+        .await
+        .map(|_| ())
+}
+
 pub async fn set_assigned<'e>(
     ex: impl PgExecutor<'e>,
     id: Uuid,

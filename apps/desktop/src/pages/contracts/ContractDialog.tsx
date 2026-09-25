@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { Contract, ContractInput, ContractUnitTerms } from "@/api/types-domain";
+import type { Contract, ContractInput, ContractUnitTerms, UnitType } from "@/api/types-domain";
 import { Field, FormDialog, SelectField, TextAreaField, TextField, opt, str } from "@/components/forms";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useApp } from "@/lib/app-state";
-import { UNIT_STATUS_LABEL, addDaysIso, todayIso, formatMoney } from "@/lib/format";
+import { UNIT_STATUS_LABEL, addDaysIso, todayIso, formatMoney, UNIT_TYPE_LABEL } from "@/lib/format";
 import { useBuildingOptions, useEmployees, useTenantOptions } from "@/lib/queries";
 
 export function ContractDialog({
@@ -20,7 +21,16 @@ export function ContractDialog({
   onOpenChange: (o: boolean) => void;
   contract?: Contract | null;
   onSaved?: (c: Contract) => void;
-  defaults?: { tenantId?: string; buildingId?: string; unitIds?: string[] };
+  defaults?: {
+    tenantId?: string;
+    buildingId?: string;
+    unitIds?: string[];
+    /** Occupants / rent per unit to start from (re-letting or renewing by hand). */
+    unitTerms?: ContractUnitTerms[];
+    rentTerms?: string | null;
+    /** The finished contract this one replaces — its units are free to take. */
+    replacesContractId?: string;
+  };
 }) {
   const { api } = useApp();
   const queryClient = useQueryClient();
@@ -65,10 +75,12 @@ export function ContractDialog({
         tenantId: defaults?.tenantId ?? "",
         buildingId: defaults?.buildingId ?? "",
         unitIds: defaults?.unitIds ?? [],
-        unitTerms: {},
+        unitTerms: Object.fromEntries(
+          (defaults?.unitTerms ?? []).map((t) => [t.unitId, { tenants: String(t.occupantCount), rent: t.rentAmount === null ? "" : t.rentAmount.toFixed(2) }]),
+        ),
         startDate: todayIso(),
         endDate: addDaysIso(todayIso(), 364),
-        rentTerms: "",
+        rentTerms: defaults?.rentTerms ?? "",
         assignedEmployeeId: "",
         notes: "",
         activate: true,
@@ -83,10 +95,29 @@ export function ContractDialog({
     queryFn: () => api.listUnits({ buildingId: form.buildingId, pageSize: 200, sort: "unit_number" }),
     enabled: open && form.buildingId !== "",
   });
-  const selectable = useMemo(
-    () => (units.data?.items ?? []).filter((u) => u.status !== "OCCUPIED" || u.contractId === contract?.id || form.unitIds.includes(u.id)),
-    [units.data, contract, form.unitIds],
-  );
+  // Every unit of the building is listed; a unit already taken is shown with the reason so
+  // an expired-but-not-handed-back unit can never be picked by mistake.
+  const mine = [contract?.id, defaults?.replacesContractId].filter(Boolean) as string[];
+  const rows = useMemo(() => {
+    const all = units.data?.items ?? [];
+    return all.map((u) => {
+      const ours = u.contractId !== null && mine.includes(u.contractId);
+      const taken = !ours && u.contractStatus !== null;
+      const reason = !taken
+        ? null
+        : u.contractStatus === "EXPIRED"
+          ? `held by ${u.tenantName ?? "the tenant"} — contract ${u.contractNumber} expired, release it first`
+          : `on contract ${u.contractNumber} (${u.tenantName ?? ""})`;
+      return { unit: u, taken: taken && !form.unitIds.includes(u.id), reason };
+    });
+  }, [units.data, mine.join(","), form.unitIds]);
+  const [unitSearch, setUnitSearch] = useState("");
+  const selectable = useMemo(() => {
+    const q = unitSearch.trim().toLowerCase();
+    return rows.filter((r) => !q || r.unit.unitNumber.toLowerCase().includes(q) || (r.unit.floor ?? "").toLowerCase().includes(q));
+  }, [rows, unitSearch]);
+  const free = selectable.filter((r) => !r.taken);
+  const allPicked = free.length > 0 && free.every((r) => form.unitIds.includes(r.unit.id));
   const locked = contract?.status === "ACTIVE";
 
   function toggleUnit(id: string, on: boolean) {
@@ -101,6 +132,7 @@ export function ContractDialog({
       buildingId: form.buildingId,
       unitIds: form.unitIds,
       unitTerms,
+      replacesContractId: contract ? null : (defaults?.replacesContractId ?? null),
       startDate: form.startDate,
       endDate: form.endDate,
       rentTerms: opt(form.rentTerms),
@@ -151,14 +183,27 @@ export function ContractDialog({
           required
           disabled={locked}
         />
-        <Field label="Units" className="sm:col-span-2" hint={form.buildingId ? "Only units without another active contract are listed." : "Choose a building first."}>
-          <div className="grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto rounded-md border p-2 md:grid-cols-3">
-            {selectable.length === 0 && <span className="col-span-full px-1 py-2 text-[12.5px] text-muted-foreground">{form.buildingId ? "No available units in this building." : "—"}</span>}
-            {selectable.map((u) => (
-              <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[13px] hover:bg-muted">
-                <Checkbox checked={form.unitIds.includes(u.id)} onCheckedChange={(c) => toggleUnit(u.id, c === true)} />
+        <Field label={`Units${form.unitIds.length ? ` · ${form.unitIds.length} selected` : ""}`} className="sm:col-span-2" hint={form.buildingId ? "A unit already on another contract is greyed out with the reason." : "Choose a building first."}>
+          {form.buildingId && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Input value={unitSearch} onChange={(e) => setUnitSearch(e.target.value)} placeholder="Find a unit…" className="h-7 w-40" aria-label="Find a unit" />
+              <Button type="button" variant="outline" size="xs" disabled={locked || free.length === 0} onClick={() => setForm((f) => ({ ...f, unitIds: allPicked ? f.unitIds.filter((id) => !free.some((r) => r.unit.id === id)) : [...new Set([...f.unitIds, ...free.map((r) => r.unit.id)])] }))}>
+                {allPicked ? "Clear these" : `Select all ${free.length} free`}
+              </Button>
+              {form.unitIds.length > 0 && !locked && (
+                <Button type="button" variant="ghost" size="xs" onClick={() => setForm((f) => ({ ...f, unitIds: [], unitTerms: {} }))}>
+                  Clear selection
+                </Button>
+              )}
+            </div>
+          )}
+          <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto rounded-md border p-2 sm:grid-cols-2 md:grid-cols-3">
+            {selectable.length === 0 && <span className="col-span-full px-1 py-2 text-[12.5px] text-muted-foreground">{form.buildingId ? "No units match." : "—"}</span>}
+            {selectable.map(({ unit: u, taken, reason }) => (
+              <label key={u.id} className={`flex items-center gap-2 rounded px-1.5 py-1 text-[13px] ${taken ? "opacity-55" : "cursor-pointer hover:bg-muted"}`} title={reason ?? undefined}>
+                <Checkbox checked={form.unitIds.includes(u.id)} disabled={taken || locked} onCheckedChange={(c) => toggleUnit(u.id, c === true)} />
                 <span className="font-medium">{u.unitNumber}</span>
-                <span className="truncate text-muted-foreground">{u.unitType ?? UNIT_STATUS_LABEL[u.status]}</span>
+                <span className="truncate text-muted-foreground">{taken ? reason : (u.unitType ? UNIT_TYPE_LABEL[u.unitType as UnitType] : UNIT_STATUS_LABEL[u.status])}</span>
               </label>
             ))}
           </div>

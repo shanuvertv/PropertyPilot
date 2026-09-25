@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Pencil, Plus } from "lucide-react";
+import { Archive, Layers, Pencil, Plus } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import type { UnitSummary } from "@/api/types-domain";
+import type { UnitSummary, UnitType } from "@/api/types-domain";
 import { ExpiryChip, RenewalStatusBadge, UnitStatusBadge } from "@/components/badges";
 import { DataTable, useViewMode, ViewToggle, type Column } from "@/components/DataTable";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
@@ -19,7 +19,8 @@ import { useApp } from "@/lib/app-state";
 import { useLocalFilter } from "@/lib/local-filter";
 import { SearchBox } from "@/components/SearchBox";
 import { selectClass } from "@/components/forms";
-import { formatDate, UNIT_STATUS_LABEL, keys } from "@/lib/format";
+import { formatDate, UNIT_STATUS_LABEL, keys, UNIT_TYPE_LABEL } from "@/lib/format";
+import { BulkUnitsDialog } from "@/pages/units/BulkUnitsDialog";
 import { UnitDialog } from "@/pages/units/UnitDialog";
 import { BuildingDialog } from "./BuildingDialog";
 
@@ -42,6 +43,7 @@ export function BuildingDetailPage() {
   const [edit, setEdit] = useState(false);
   const [unitDialog, setUnitDialog] = useState<{ open: boolean; unit?: UnitSummary | null }>({ open: false });
   const [error, setError] = useState<string | null>(null);
+  const [bulkUnits, setBulkUnits] = useState(false);
 
   const detail = useQuery({ queryKey: ["buildings", id], queryFn: () => api.getBuilding(id) });
   const unitFilter = useLocalFilter(detail.data?.units, (u) => [u.unitNumber, u.tenantName, u.unitType, u.floor, u.status, u.contractNumber]);
@@ -64,7 +66,7 @@ export function BuildingDetailPage() {
   const unitColumns: Column<UnitSummary>[] = [
     { key: "unit", header: "Unit", render: (u) => <span className="font-medium">{u.unitNumber}</span> },
     { key: "floor", header: "Floor", render: (u) => u.floor ?? "—" },
-    { key: "type", header: "Type", render: (u) => u.unitType ?? "—" },
+    { key: "type", header: "Type", render: (u) => (u.unitType ? UNIT_TYPE_LABEL[u.unitType as UnitType] ?? u.unitType : "—") },
     { key: "people", header: "No. of occupants", className: "text-right tabular-nums", card: "metric", render: (u) => u.occupantCount },
     { key: "status", header: "Status", card: "badge", render: (u) => <UnitStatusBadge status={u.status} /> },
     { key: "tenant", header: "Tenant", render: (u) => (u.tenantId ? <Link to={`/tenants/${u.tenantId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{u.tenantName}</Link> : "—") },
@@ -142,10 +144,16 @@ export function BuildingDetailPage() {
               <ViewToggle value={view} onChange={setView} />
             </div>
             {can("MANAGE_UNITS") && (
-              <Button size="sm" onClick={() => setUnitDialog({ open: true, unit: null })}>
-                <Plus data-icon="inline-start" />
-                Add unit
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setBulkUnits(true)}>
+                  <Layers data-icon="inline-start" />
+                  Add many units
+                </Button>
+                <Button size="sm" onClick={() => setUnitDialog({ open: true, unit: null })}>
+                  <Plus data-icon="inline-start" />
+                  Add unit
+                </Button>
+              </div>
             )}
           </div>
           <DataTable
@@ -169,6 +177,7 @@ export function BuildingDetailPage() {
       </Tabs>
 
       <BuildingDialog open={edit} onOpenChange={setEdit} building={b} onSaved={() => void queryClient.invalidateQueries({ queryKey: ["buildings", id] })} />
+      <BulkUnitsDialog open={bulkUnits} onOpenChange={setBulkUnits} buildingId={id} onSaved={() => void queryClient.invalidateQueries({ queryKey: ["buildings", id] })} />
       <UnitDialog
         open={unitDialog.open}
         onOpenChange={(o) => setUnitDialog((d) => ({ ...d, open: o }))}

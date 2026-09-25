@@ -12,7 +12,7 @@ use crate::auth::CurrentUser;
 use crate::dto;
 use crate::error::ApiFailure;
 use crate::routes::master::list_query;
-use crate::state::AppState;
+use crate::state::{AppState, LiveEvent};
 
 pub async fn list(
     State(state): State<AppState>,
@@ -101,7 +101,15 @@ pub async fn create(
     Json(input): Json<ContractInput>,
 ) -> Result<(StatusCode, Json<Contract>), ApiFailure> {
     let activate = input.activate.unwrap_or(true);
-    let row = contracts::create(&state.pool, &caller, contract_input(&input)?, activate).await?;
+    let replaces = dto::uuid_opt(&input.replaces_contract_id, "contract being replaced")?;
+    let row = contracts::create(
+        &state.pool,
+        &caller,
+        contract_input(&input)?,
+        activate,
+        replaces,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(dto::contract(row))))
 }
 
@@ -125,6 +133,17 @@ pub async fn activate(
     )))
 }
 
+/// Hands the units of a finished contract back so they can be let again.
+pub async fn release(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Contract>, ApiFailure> {
+    let row = contracts::release(&state.pool, &caller, id).await?;
+    state.publish(LiveEvent::data());
+    Ok(Json(dto::contract(row)))
+}
+
 pub async fn terminate(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,
@@ -132,7 +151,14 @@ pub async fn terminate(
     Json(req): Json<TerminateContractRequest>,
 ) -> Result<Json<Contract>, ApiFailure> {
     Ok(Json(dto::contract(
-        contracts::terminate(&state.pool, &caller, id, req.reason.as_deref()).await?,
+        contracts::terminate(
+            &state.pool,
+            &caller,
+            id,
+            req.reason.as_deref(),
+            dto::date_opt(&req.ended_on, "end date")?,
+        )
+        .await?,
     )))
 }
 

@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::auth::CurrentUser;
 use crate::dto;
 use crate::error::ApiFailure;
-use crate::state::AppState;
+use crate::state::{AppState, LiveEvent};
 
 pub fn list_query(p: &ListParams) -> ListQuery {
     ListQuery::new(
@@ -123,6 +123,11 @@ pub async fn list_units(
         renewal_status: p.renewal_status.map(|s| s.to_string()),
         tenant_id: dto::uuid_opt(&p.tenant_id, "tenant")?,
         expiring_soon: p.expiring_soon,
+        unit_type: p
+            .unit_type
+            .clone()
+            .filter(|t| !t.is_empty())
+            .map(|t| t.to_ascii_uppercase()),
     };
     let res = units::list(&state.pool, &caller, &f, &q).await?;
     Ok(Json(dto::page(res, q.page, q.page_size, dto::unit)))
@@ -176,13 +181,51 @@ pub async fn set_unit_status(
     Ok(Json(dto::unit(row)))
 }
 
+#[derive(serde::Deserialize)]
+pub struct RemoveUnitQuery {
+    /// `true` deletes a unit created by mistake; anything with history is archived instead.
+    pub permanent: Option<bool>,
+}
+
 pub async fn archive_unit(
     State(state): State<AppState>,
     CurrentUser(caller): CurrentUser,
     Path(id): Path<Uuid>,
+    Query(q): Query<RemoveUnitQuery>,
 ) -> Result<StatusCode, ApiFailure> {
-    units::archive(&state.pool, &caller, id).await?;
+    if q.permanent.unwrap_or(false) {
+        units::delete(&state.pool, &caller, id).await?;
+    } else {
+        units::archive(&state.pool, &caller, id).await?;
+    }
+    state.publish(LiveEvent::data());
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Adds many units to a building in one go (a whole floor, a whole new building).
+pub async fn create_units_bulk(
+    State(state): State<AppState>,
+    CurrentUser(caller): CurrentUser,
+    Path(building_id): Path<Uuid>,
+    Json(req): Json<BulkUnitsRequest>,
+) -> Result<Json<BulkUnitsResult>, ApiFailure> {
+    let res = units::create_bulk(
+        &state.pool,
+        &caller,
+        units::BulkUnits {
+            building_id,
+            numbers: req.numbers,
+            floors: req.floors.into_iter().map(Some).collect(),
+            unit_type: req.unit_type.filter(|t| !t.is_empty()),
+            notes: req.notes,
+        },
+    )
+    .await?;
+    state.publish(LiveEvent::data());
+    Ok(Json(BulkUnitsResult {
+        created: res.created as i64,
+        skipped: res.skipped,
+    }))
 }
 
 // ---------------------------------------------------------------- tenants

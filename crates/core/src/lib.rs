@@ -21,7 +21,7 @@ pub use roles::{Capability, Role};
 pub use split::{equal_split, format_minor, settled_amount};
 pub use status::{
     ChequeStatus, ContractStatus, EmailStatus, ExpenseCategory, FollowUpStatus, FollowUpType,
-    NoticeStatus, RenewalStatus, ReportBucket, SplitMethod, TenantResponse, UnitStatus,
+    NoticeStatus, RenewalStatus, ReportBucket, SplitMethod, TenantResponse, UnitStatus, UnitType,
 };
 pub use sweep::{
     plan as plan_sweep, Action as SweepAction, ReminderRule, SweepContract, SweepInput,

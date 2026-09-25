@@ -1,6 +1,6 @@
 //! Phase 1 wire types: buildings, units, tenants, documents, paging.
 
-use renewal_core::{Band, RenewalStatus, UnitStatus};
+use renewal_core::{Band, ContractStatus, RenewalStatus, UnitStatus};
 use serde::{Deserialize, Serialize};
 
 /// Paged list envelope used by every list endpoint.
@@ -118,6 +118,8 @@ pub struct UnitSummary {
     pub notes: Option<String>,
     pub contract_id: Option<String>,
     pub contract_number: Option<String>,
+    /// `ACTIVE`, or `EXPIRED` while the tenant has not handed the unit back.
+    pub contract_status: Option<ContractStatus>,
     /// This unit's rent under its active contract.
     pub rent_amount: Option<f64>,
     pub tenant_id: Option<String>,
@@ -171,6 +173,30 @@ pub struct UnitListParams {
     pub renewal_status: Option<RenewalStatus>,
     pub tenant_id: Option<String>,
     pub expiring_soon: Option<bool>,
+    /// `RESIDENTIAL` / `COMMERCIAL`.
+    pub unit_type: Option<String>,
+}
+
+/// Adds a whole floor or building of units at once; numbers already in use are skipped.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct BulkUnitsRequest {
+    pub numbers: Vec<String>,
+    /// One floor for all of them, or one per unit number.
+    #[serde(default)]
+    pub floors: Vec<String>,
+    pub unit_type: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct BulkUnitsResult {
+    pub created: i64,
+    /// Numbers that already existed in the building.
+    pub skipped: Vec<String>,
 }
 
 // ---------------------------------------------------------------- tenants

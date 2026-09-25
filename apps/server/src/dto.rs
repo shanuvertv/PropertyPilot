@@ -179,6 +179,7 @@ pub fn unit(u: UnitSummaryRow) -> UnitSummary {
         notes: u.notes,
         contract_id: u.contract_id.map(|x| x.to_string()),
         contract_number: u.contract_number,
+        contract_status: u.contract_status.as_deref().and_then(parse_enum),
         rent_amount: u.rent_amount_minor.map(money),
         tenant_id: u.tenant_id.map(|x| x.to_string()),
         tenant_name: u.tenant_name,

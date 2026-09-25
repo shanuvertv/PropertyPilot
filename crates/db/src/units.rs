@@ -24,6 +24,8 @@ pub struct UnitSummaryRow {
     pub updated_at: DateTime<Utc>,
     pub contract_id: Option<Uuid>,
     pub contract_number: Option<String>,
+    /// `ACTIVE`, or `EXPIRED` while the tenant has not handed the unit back.
+    pub contract_status: Option<String>,
     pub start_date: Option<NaiveDate>,
     pub end_date: Option<NaiveDate>,
     /// This unit's rent under its active contract (minor units).
@@ -59,11 +61,14 @@ pub struct UnitFilter {
     pub tenant_id: Option<Uuid>,
     /// Only units whose current contract is expiring soon.
     pub expiring_soon: Option<bool>,
+    /// `RESIDENTIAL` / `COMMERCIAL`.
+    pub unit_type: Option<String>,
 }
 
 const SELECT: &str = "SELECT u.id, u.building_id, b.name AS building_name, b.code AS building_code, u.unit_number, u.floor,
        u.unit_type, u.status, COALESCE(c.unit_occupants, 0) AS occupant_count, u.notes, u.created_at, u.updated_at,
-       c.id AS contract_id, c.contract_number, c.start_date, c.end_date, c.unit_rent AS rent_amount_minor,
+       c.id AS contract_id, c.contract_number, c.status AS contract_status, c.start_date, c.end_date,
+       c.unit_rent AS rent_amount_minor,
        t.id AS tenant_id, t.name AS tenant_name,
        e.remaining_days, e.band, e.expiring_soon, e.urgent,
        rc.id AS case_id, rc.status AS renewal_status,
@@ -73,8 +78,9 @@ const SELECT: &str = "SELECT u.id, u.building_id, b.name AS building_name, b.cod
   LEFT JOIN LATERAL (
         SELECT c.*, cu.occupant_count AS unit_occupants, cu.rent_amount_minor AS unit_rent
           FROM contracts c JOIN contract_units cu ON cu.contract_id = c.id
-         WHERE cu.unit_id = u.id AND c.status = 'ACTIVE'
-         ORDER BY c.end_date DESC LIMIT 1) c ON TRUE
+         WHERE cu.unit_id = u.id
+           AND (c.status = 'ACTIVE' OR (c.status = 'EXPIRED' AND u.status = 'OCCUPIED'))
+         ORDER BY (c.status = 'ACTIVE') DESC, c.end_date DESC LIMIT 1) c ON TRUE
   LEFT JOIN tenants t ON t.id = c.tenant_id
   LEFT JOIN v_contract_expiry e ON e.contract_id = c.id
   LEFT JOIN renewal_cases rc ON rc.contract_id = c.id AND rc.status NOT IN ('RENEWAL_COMPLETED', 'CLOSED')
@@ -101,6 +107,9 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, f: &UnitFilter, like: &Option<S
     }
     if let Some(s) = &f.status {
         qb.push(" AND u.status = ").push_bind(s.clone());
+    }
+    if let Some(t) = &f.unit_type {
+        qb.push(" AND u.unit_type = ").push_bind(t.clone());
     }
     if let Some(band) = &f.band {
         qb.push(" AND e.band = ").push_bind(band.clone());
@@ -221,6 +230,65 @@ pub async fn insert<'e>(
     .await
 }
 
+/// Creates several units of one building in one statement; returns the new ids.
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_many<'e>(
+    ex: impl PgExecutor<'e>,
+    building_id: Uuid,
+    numbers: &[String],
+    floors: &[Option<String>],
+    unit_type: Option<&str>,
+    status: &str,
+    notes: Option<&str>,
+    created_by: Uuid,
+) -> DbResult<Vec<Uuid>> {
+    sqlx::query_scalar(
+        "INSERT INTO units (building_id, unit_number, floor, unit_type, status, notes, created_by)
+         SELECT $1, n, f, $4, $5, $6, $7 FROM unnest($2::text[], $3::text[]) AS t(n, f)
+         RETURNING id",
+    )
+    .bind(building_id)
+    .bind(numbers)
+    .bind(floors)
+    .bind(unit_type)
+    .bind(status)
+    .bind(notes)
+    .bind(created_by)
+    .fetch_all(ex)
+    .await
+}
+
+/// Unit numbers of the building that already exist (archived ones included).
+pub async fn existing_numbers<'e>(
+    ex: impl PgExecutor<'e>,
+    building_id: Uuid,
+) -> DbResult<Vec<String>> {
+    sqlx::query_scalar("SELECT unit_number FROM units WHERE building_id = $1")
+        .bind(building_id)
+        .fetch_all(ex)
+        .await
+}
+
+/// True when anything references the unit, so it can only be archived, never deleted.
+pub async fn has_history<'e>(ex: impl PgExecutor<'e>, id: Uuid) -> DbResult<bool> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM contract_units WHERE unit_id = $1)
+             OR EXISTS (SELECT 1 FROM expenses WHERE unit_id = $1)",
+    )
+    .bind(id)
+    .fetch_one(ex)
+    .await
+}
+
+/// Removes a unit that was never used (see `has_history`).
+pub async fn delete<'e>(ex: impl PgExecutor<'e>, id: Uuid) -> DbResult<()> {
+    sqlx::query("DELETE FROM units WHERE id = $1")
+        .bind(id)
+        .execute(ex)
+        .await
+        .map(|_| ())
+}
+
 pub async fn update<'e>(ex: impl PgExecutor<'e>, id: Uuid, input: &UnitInput) -> DbResult<()> {
     sqlx::query(
         "UPDATE units SET building_id = $2, unit_number = $3, floor = $4, unit_type = $5, status = $6, notes = $7, updated_at = now()
@@ -277,18 +345,53 @@ pub async fn archive<'e>(ex: impl PgExecutor<'e>, id: Uuid) -> DbResult<()> {
         .map(|_| ())
 }
 
-/// Ids of the given units that currently have an ACTIVE contract (other than `except`).
-pub async fn occupied_by_other_contract<'e>(
+/// A unit that cannot go on a new contract yet, and why.
+#[derive(Debug, Clone, FromRow)]
+pub struct UnitBlocker {
+    pub unit_id: Uuid,
+    pub unit_number: String,
+    pub contract_id: Uuid,
+    pub contract_number: String,
+    pub contract_status: String,
+    pub tenant_name: String,
+    pub end_date: NaiveDate,
+}
+
+/// Units that are taken: under an ACTIVE contract, or still held under an EXPIRED one
+/// whose tenant has not handed the unit back. `except` ignores one contract (the one
+/// being edited or replaced).
+pub async fn blockers<'e>(
     ex: impl PgExecutor<'e>,
     unit_ids: &[Uuid],
-    except: Option<Uuid>,
-) -> DbResult<Vec<Uuid>> {
-    sqlx::query_scalar(
-        "SELECT DISTINCT cu.unit_id FROM contract_units cu JOIN contracts c ON c.id = cu.contract_id
-          WHERE cu.unit_id = ANY($1) AND c.status = 'ACTIVE' AND ($2::uuid IS NULL OR c.id <> $2)",
+    except: &[Uuid],
+) -> DbResult<Vec<UnitBlocker>> {
+    sqlx::query_as(
+        "SELECT DISTINCT ON (cu.unit_id) cu.unit_id, u.unit_number, c.id AS contract_id, c.contract_number,
+                c.status AS contract_status, t.name AS tenant_name, c.end_date
+           FROM contract_units cu
+           JOIN contracts c ON c.id = cu.contract_id
+           JOIN units u ON u.id = cu.unit_id
+           JOIN tenants t ON t.id = c.tenant_id
+          WHERE cu.unit_id = ANY($1) AND NOT (c.id = ANY($2))
+            AND (c.status = 'ACTIVE' OR (c.status = 'EXPIRED' AND u.status = 'OCCUPIED'))
+          ORDER BY cu.unit_id, (c.status = 'ACTIVE') DESC, c.end_date DESC",
     )
     .bind(unit_ids)
     .bind(except)
     .fetch_all(ex)
     .await
+}
+
+/// Ids of the given units that are taken (see `blockers`).
+pub async fn occupied_by_other_contract<'e>(
+    ex: impl PgExecutor<'e>,
+    unit_ids: &[Uuid],
+    except: Option<Uuid>,
+) -> DbResult<Vec<Uuid>> {
+    let except: Vec<Uuid> = except.into_iter().collect();
+    Ok(blockers(ex, unit_ids, &except)
+        .await?
+        .into_iter()
+        .map(|b| b.unit_id)
+        .collect())
 }
